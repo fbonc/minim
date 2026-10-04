@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use base64::Engine;
 use eventsource_stream::Eventsource;
@@ -37,6 +37,7 @@ pub struct OpenAiProvider {
     models: Vec<String>,
     endpoint: Arc<str>,
     request_abort: RequestAbortController,
+    last_request: Arc<Mutex<Option<(String, ProviderRequest)>>>,
 }
 
 impl OpenAiProvider {
@@ -49,6 +50,7 @@ impl OpenAiProvider {
             models: config.models,
             endpoint: endpoint.into(),
             request_abort: RequestAbortController::default(),
+            last_request: Arc::default(),
         }
     }
 
@@ -95,6 +97,11 @@ impl Provider for OpenAiProvider {
     }
 
     fn stream(&self, model: &str, request: ProviderRequest) -> ProviderStream {
+        *self
+            .last_request
+            .lock()
+            .expect("OpenAI last request mutex poisoned") =
+            Some((model.to_owned(), request.clone()));
         let client = self.client.clone();
         let api_key = Arc::clone(&self.api_key);
         let endpoint = Arc::clone(&self.endpoint);
@@ -113,6 +120,16 @@ impl Provider for OpenAiProvider {
 
     fn abort_request(&self) {
         self.request_abort.abort();
+    }
+
+    fn retry_request(&self) -> Option<ProviderStream> {
+        let request = self
+            .last_request
+            .lock()
+            .expect("OpenAI last request mutex poisoned")
+            .clone();
+
+        request.map(|(model, request)| self.stream(&model, request))
     }
 }
 
@@ -343,6 +360,28 @@ mod tests {
             Some(Ok(ProviderOutput::TextDelta("I cannot".into())))
         );
         assert_eq!(parse_event(r#"{"type":"response.completed"}"#), None);
+    }
+
+    #[test]
+    fn retries_the_last_request() {
+        let provider = OpenAiProvider::new(OpenAiConfig {
+            api_key: "test-key".into(),
+            models: vec!["gpt-test".into()],
+            base_url: "http://127.0.0.1:1".into(),
+        });
+        assert!(provider.retry_request().is_none());
+        drop(provider.stream("gpt-test", request(None)));
+
+        assert!(provider.retry_request().is_some());
+        let (model, request) = provider
+            .last_request
+            .lock()
+            .expect("OpenAI last request mutex poisoned")
+            .clone()
+            .expect("last request");
+        assert_eq!(model, "gpt-test");
+        assert_eq!(request.prompt.as_deref(), Some("What does this mean?"));
+        assert!(request.context.is_some());
     }
 
     #[tokio::test]

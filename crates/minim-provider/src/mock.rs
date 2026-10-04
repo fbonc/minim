@@ -1,3 +1,4 @@
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use futures_util::future::Abortable;
@@ -58,6 +59,7 @@ In short:
 pub struct MockProvider {
     chunk_delay: Duration,
     request_abort: RequestAbortController,
+    last_request: Arc<Mutex<Option<(String, ProviderRequest)>>>,
 }
 
 impl MockProvider {
@@ -65,6 +67,7 @@ impl MockProvider {
         Self {
             chunk_delay,
             request_abort: RequestAbortController::default(),
+            last_request: Arc::default(),
         }
     }
 
@@ -95,7 +98,11 @@ impl Provider for MockProvider {
         vec!["mock".to_owned()]
     }
 
-    fn stream(&self, _model: &str, request: ProviderRequest) -> ProviderStream {
+    fn stream(&self, model: &str, request: ProviderRequest) -> ProviderStream {
+        *self
+            .last_request
+            .lock()
+            .expect("mock last request mutex poisoned") = Some((model.to_owned(), request.clone()));
         let delay = self.chunk_delay;
         let chunks = Self::answer(&request)
             .split_inclusive(' ')
@@ -116,6 +123,16 @@ impl Provider for MockProvider {
 
     fn abort_request(&self) {
         self.request_abort.abort();
+    }
+
+    fn retry_request(&self) -> Option<ProviderStream> {
+        let request = self
+            .last_request
+            .lock()
+            .expect("mock last request mutex poisoned")
+            .clone();
+
+        request.map(|(model, request)| self.stream(&model, request))
     }
 }
 
@@ -151,6 +168,35 @@ mod tests {
 
         assert!(reply.contains("Image target captured"));
         assert!(reply.contains("describe this"));
+    }
+
+    #[test]
+    fn retries_the_last_request() {
+        let provider = MockProvider::new(Duration::ZERO);
+        assert!(provider.retry_request().is_none());
+        let request = ProviderRequest {
+            prompt: Some("retry this".into()),
+            target: Some(Target::Image(ImageCapture {
+                png: b"png".to_vec(),
+                region: None,
+            })),
+            context: None,
+        };
+        drop(provider.stream("mock", request));
+
+        let reply = block_on(
+            provider
+                .retry_request()
+                .expect("stored request should be retryable")
+                .map(Result::unwrap)
+                .map(|output| match output {
+                    ProviderOutput::TextDelta(chunk) => chunk,
+                })
+                .collect::<String>(),
+        );
+
+        assert!(reply.contains("Image target captured"));
+        assert!(reply.contains("retry this"));
     }
 
     #[tokio::test]

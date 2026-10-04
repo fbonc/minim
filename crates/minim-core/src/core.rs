@@ -226,6 +226,10 @@ mod tests {
         fn abort_request(&self) {
             self.aborted.store(true, Ordering::SeqCst);
         }
+
+        fn retry_request(&self) -> Option<ProviderStream> {
+            None
+        }
     }
 
     impl Capturer for StubCapturer {
