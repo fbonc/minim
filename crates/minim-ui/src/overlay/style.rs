@@ -46,6 +46,7 @@ pub const INPUT_ACTION_SPACING: f32 = 0.0;
 pub const TARGET_SIZE: f32 = 16.0;
 pub const TARGET_CLEAR_ICON_SIZE: f32 = 17.0;
 pub const ABORT_ICON_SIZE: f32 = 13.0;
+pub const RETRY_ICON_SIZE: f32 = 17.0;
 pub const LOADING_ICON_SIZE: f32 = 20.0;
 pub const INPUT_SIZE: f32 = 16.0;
 pub const ANSWER_SIZE: f32 = 15.0;

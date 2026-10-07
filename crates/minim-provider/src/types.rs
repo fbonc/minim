@@ -71,6 +71,8 @@ pub trait Provider: Send + Sync {
     fn stream(&self, model: &str, request: ProviderRequest) -> ProviderStream;
 
     fn abort_request(&self);
+
+    fn retry_request(&self) -> Option<ProviderStream>;
 }
 
 #[derive(Debug, Clone, Default)]
