@@ -109,13 +109,17 @@ pub fn input(_theme: &Theme, _status: text_input::Status) -> text_input::Style {
 
 pub fn send_button(_theme: &Theme, status: button::Status) -> button::Style {
     let background = match status {
-        button::Status::Hovered | button::Status::Pressed => Color::from_rgb8(0x81, 0x73, 0xFF),
-        _ => Color::from_rgb8(0x6C, 0x5C, 0xFF),
+        button::Status::Hovered => Some(BORDER_COLOR.into()),
+        button::Status::Pressed => Some(INPUT_BORDER_COLOR.into()),
+        button::Status::Active | button::Status::Disabled => None,
     };
 
     button::Style {
-        background: Some(background.into()),
-        text_color: Color::WHITE,
+        background,
+        text_color: match status {
+            button::Status::Disabled => MUTED_COLOR,
+            _ => Color::from_rgb8(0xC9, 0xC2, 0xFF),
+        },
         border: Border {
             radius: INPUT_RADIUS.into(),
             ..Default::default()
