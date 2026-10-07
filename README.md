@@ -1,18 +1,18 @@
 <p align="center">
-  <img width="350" alt="banner" src="https://github.com/user-attachments/assets/2cf57835-4e97-41b8-bfac-84c4e3675673" />
+  <img width="350" alt="banner" src="https://github.com/user-attachments/assets/e714ec64-e4dc-4d10-845f-17a037229b07" />
 </p>
 
 ```Previously "Little Owl"```
 
 An app for asking questions about what you are reading or viewing, right when a question comes to mind.
 
-A linear chat thread is fundamentally a flawed medium for atomic questions. Minim is being built to keep each answer connected to its source, so useful explanations do not disappear into a chat thread.
+A linear chat thread is fundamentally a flawed medium for atomic questions.  is being built to keep each answer connected to its source, so useful explanations do not disappear into a chat thread.
 
 ## Why
 
 Copying something into a chat loses the surrounding context. Switching apps interrupts the question, and small, unrelated answers get buried in a long conversation. This is especially awkward when reading a paper or another document you cannot edit: a term needs a quick explanation, but asking about it takes you away from the page.
 
-Minim aims to eliminate the friction from having a question to asking it, and then organize the answers by where those questions came from.
+Ruru aims to eliminate the friction from having a question to asking it, and then organize the answers by where those questions came from.
 
 ## How it works
 
@@ -28,6 +28,6 @@ For example, highlighting an unfamiliar term in a PDF should give the model the 
 
 ## Architecture
 
-This is a Rust workspace with an Iced desktop UI. `minim-hotkey` starts a lookup; `minim-core` coordinates capture and the answer request; `minim-capture` owns the macOS Accessibility, clipboard, screenshot, and provenance code; and `minim-provider` defines the streaming model interface. `minim-app` hosts the `minim-ui` overlay, while `minim-types` holds the data shared between crates.
+This is a Rust workspace with an Iced desktop UI. `-hotkey` starts a lookup; `-core` coordinates capture and the answer request; `-capture` owns the macOS Accessibility, clipboard, screenshot, and provenance code; and `-provider` defines the streaming model interface. `-app` hosts the `-ui` overlay, while `-types` holds the data shared between crates.
 
 The capture and overlay flow is implemented. Model integration and source-linked answer history are the next pieces of the intended app.
