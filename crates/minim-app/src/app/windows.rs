@@ -3,6 +3,34 @@ use minim_types::WindowBounds;
 
 use super::{Input, PROMPTING_HEIGHT, WINDOW_WIDTH};
 
+pub(super) fn main_settings() -> iced_window::Settings {
+    iced_window::Settings {
+        size: iced::Size::new(900.0, 620.0),
+        min_size: Some(iced::Size::new(600.0, 400.0)),
+        position: iced_window::Position::Centered,
+        exit_on_close_request: false,
+        ..Default::default()
+    }
+}
+
+pub(super) fn overlay_settings() -> iced_window::Settings {
+    iced_window::Settings {
+        size: iced::Size::new(WINDOW_WIDTH, PROMPTING_HEIGHT),
+        min_size: Some(iced::Size::new(
+            super::MIN_WINDOW_WIDTH,
+            super::MIN_WINDOW_HEIGHT,
+        )),
+        position: iced_window::Position::Centered,
+        visible: false,
+        decorations: false,
+        transparent: true,
+        resizable: true,
+        level: iced_window::Level::AlwaysOnTop,
+        exit_on_close_request: false,
+        ..Default::default()
+    }
+}
+
 pub(super) fn show_overlay(
     id: iced_window::Id,
     focused_window: Option<WindowBounds>,

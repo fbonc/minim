@@ -1,7 +1,9 @@
 use iced::Element;
 use minim_provider::ModelSelection;
 
+pub mod main_window;
 pub mod overlay;
+pub(crate) mod style;
 
 pub use minim_types::Target;
 pub use overlay::Output as OverlayOutput;

@@ -1,13 +1,16 @@
 use iced::{Task, Theme, window as iced_window};
 use minim_core::{Output as CoreOutput, Sender as CoreSender};
 use minim_provider::ProviderRegistry;
-use minim_ui::Overlay;
+use minim_ui::Overlay as OverlayUi;
+use minim_ui::main_window::{self, MainWindow as MainWindowUi};
 use minim_ui::overlay;
 
 mod providers;
+#[cfg(target_os = "macos")]
+mod reopen;
 mod update;
 mod view;
-mod window;
+mod windows;
 
 const WINDOW_WIDTH: f32 = 500.0;
 const MIN_WINDOW_WIDTH: f32 = 225.0;
@@ -16,40 +19,37 @@ const MIN_WINDOW_HEIGHT: f32 = PROMPTING_HEIGHT;
 const ANSWERING_HEIGHT: f32 = 360.0;
 
 struct App {
-    overlay: Overlay,
+    main_window: WindowHost<MainWindowUi>,
+    overlay: WindowHost<OverlayUi>,
     providers: ProviderRegistry,
     to_core: CoreSender,
-    window: Option<iced_window::Id>,
     selecting_region: bool,
+}
+
+struct WindowHost<T> {
+    id: iced_window::Id,
+    ui: T,
 }
 
 #[derive(Debug, Clone)]
 enum Input {
-    WindowOpened(Option<iced_window::Id>),
+    WindowOpened(iced_window::Id),
+    WindowCloseRequested(iced_window::Id),
+    #[cfg(target_os = "macos")]
+    ShowMainWindow,
     DragWindow,
     Core(CoreOutput),
+    MainWindow(main_window::Input),
     Overlay(overlay::Input),
-    CheckPromptInputFocus,
+    CheckPromptInputFocus(iced_window::Id),
     BeginRegionSelection,
 }
 
 pub(super) fn run() -> iced::Result {
-    iced::application(boot, update::update, view::view)
+    iced::daemon(boot, update::update, view::view)
         .subscription(view::subscription)
-        .theme(|_state: &App| Theme::Dark)
+        .theme(Theme::Dark)
         .title("minim")
-        .window(iced_window::Settings {
-            size: iced::Size::new(WINDOW_WIDTH, PROMPTING_HEIGHT),
-            min_size: Some(iced::Size::new(MIN_WINDOW_WIDTH, MIN_WINDOW_HEIGHT)),
-            position: iced_window::Position::Centered,
-            visible: false,
-            decorations: false,
-            transparent: true,
-            resizable: true,
-            level: iced_window::Level::AlwaysOnTop,
-            exit_on_close_request: false,
-            ..Default::default()
-        })
         .style(|_state: &App, _theme: &iced::Theme| iced::theme::Style {
             background_color: iced::Color::TRANSPARENT,
             text_color: iced::Color::BLACK,
@@ -60,18 +60,29 @@ pub(super) fn run() -> iced::Result {
 fn boot() -> (App, Task<Input>) {
     let (providers, selected_model) = providers::load_providers();
     let (to_core, core_outputs) = minim_core::start(providers.clone());
+    let (main, open_main) = iced_window::open(windows::main_settings());
+    let (overlay, open_overlay) = iced_window::open(windows::overlay_settings());
+
+    let tasks = vec![
+        open_main.map(Input::WindowOpened),
+        open_overlay.map(Input::WindowOpened),
+        Task::run(core_outputs, Input::Core),
+    ];
 
     (
         App {
-            overlay: Overlay::new().with_selected_model(selected_model),
+            main_window: WindowHost {
+                id: main,
+                ui: MainWindowUi::new(),
+            },
+            overlay: WindowHost {
+                id: overlay,
+                ui: OverlayUi::new().with_selected_model(selected_model),
+            },
             providers,
             to_core,
-            window: None,
             selecting_region: false,
         },
-        Task::batch([
-            iced_window::latest().map(Input::WindowOpened),
-            Task::run(core_outputs, Input::Core),
-        ]),
+        Task::batch(tasks),
     )
 }
