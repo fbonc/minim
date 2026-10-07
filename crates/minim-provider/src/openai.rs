@@ -147,10 +147,7 @@ impl ResponsesRequest {
         }
 
         content.push(InputContent::Text {
-            text: format!(
-                "Question:\n{}",
-                request.prompt.as_deref().unwrap()
-            ),
+            text: format!("Question:\n{}", request.prompt.as_deref().unwrap_or("")),
         });
 
         Self {
