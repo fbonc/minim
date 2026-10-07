@@ -3,22 +3,12 @@ use iced::widget::{button, container, markdown, overlay::menu, pick_list, scroll
 use iced::{Background, Border, Color, Font, Shadow, Theme};
 
 pub use crate::style::{
-    ACCENT_COLOR, BACKGROUND_COLOR, BORDER_COLOR, DANGER_COLOR, INPUT_BACKGROUND,
-    INPUT_BORDER_COLOR, MUTED_COLOR, SCROLLBAR_WIDTH, SCROLLER_COLOR, SELECTION_COLOR, TEXT_COLOR,
+    ACCENT_COLOR, BORDER_COLOR, DANGER_COLOR, INPUT_BACKGROUND, INPUT_BORDER_COLOR, MUTED_COLOR,
+    SCROLLBAR_WIDTH, SCROLLER_COLOR, SELECTION_COLOR, TEXT_COLOR,
 };
 
-pub const MODEL_PICKER_BACKGROUND: Color = Color {
-    r: 0.094,
-    g: 0.125,
-    b: 0.200,
-    a: 1.0,
-};
-pub const MODEL_MENU_HIGHLIGHT: Color = Color {
-    r: 0.165,
-    g: 0.208,
-    b: 0.314,
-    a: 1.0,
-};
+pub const MODEL_PICKER_BACKGROUND: Color = Color::from_rgb8(0x21, 0x1E, 0x2C);
+pub const MODEL_MENU_HIGHLIGHT: Color = Color::from_rgb8(0x2C, 0x27, 0x50);
 pub const BORDER_STYLE: Border = Border {
     color: BORDER_COLOR,
     width: 1.0,
@@ -59,15 +49,15 @@ pub const CAPTURE_BUTTON_SPACING: f32 = 6.0;
 pub const MODEL_PICKER_TEXT_SIZE: f32 = 13.0;
 
 pub const PLACEHOLDERS: [&str; 9] = [
-    "Hoot away…",
-    "Hoot’s on your mind?",
-    "Hoot me a question…",
-    "Ask the owl…",
-    "I’m owl ears…",
-    "Whooo’s curious?",
-    "Perch a thought…",
-    "Hoot me...",
-    "In my owl-pinion...",
+    "Ask Ruru…",
+    "What’s on your mind?",
+    "Ribbit me a question…",
+    "Hop to it…",
+    "Croak away…",
+    "Toss Ruru a fly…",
+    "Ponder away…",
+    "Leap in…",
+    "What are we wondering?",
 ];
 pub const IMAGE_TARGET_LABEL: &str = "[image capture]";
 
@@ -80,16 +70,11 @@ const ANSWER_FONT: Font = Font::DEFAULT;
 pub const HINT_TEXT: &str = "Or just press Enter — I’ll figure it out";
 pub const HINT_SIZE: f32 = 12.5;
 pub const HINT_SPACING: f32 = 8.0;
-pub const HINT_COLOR: Color = Color {
-    r: 0.945,
-    g: 0.922,
-    b: 0.871,
-    a: 0.52,
-};
+pub const HINT_COLOR: Color = Color::from_rgb8(0x8C, 0x87, 0xA3);
 
 pub fn input_box(_theme: &Theme, focused: bool) -> container::Style {
     let border_color = if focused {
-        ACCENT_COLOR
+        Color::from_rgba8(0xA9, 0x9F, 0xFF, 0.45)
     } else {
         INPUT_BORDER_COLOR
     };
@@ -124,24 +109,13 @@ pub fn input(_theme: &Theme, _status: text_input::Status) -> text_input::Style {
 
 pub fn send_button(_theme: &Theme, status: button::Status) -> button::Style {
     let background = match status {
-        button::Status::Hovered => Color {
-            r: 1.0,
-            g: 0.976,
-            b: 0.933,
-            a: 1.0,
-        },
-        button::Status::Pressed => Color {
-            r: 0.839,
-            g: 0.812,
-            b: 0.761,
-            a: 1.0,
-        },
-        _ => ACCENT_COLOR,
+        button::Status::Hovered | button::Status::Pressed => Color::from_rgb8(0x81, 0x73, 0xFF),
+        _ => Color::from_rgb8(0x6C, 0x5C, 0xFF),
     };
 
     button::Style {
         background: Some(background.into()),
-        text_color: BACKGROUND_COLOR,
+        text_color: Color::WHITE,
         border: Border {
             radius: INPUT_RADIUS.into(),
             ..Default::default()
@@ -153,7 +127,7 @@ pub fn send_button(_theme: &Theme, status: button::Status) -> button::Style {
 pub fn header_button(_theme: &Theme, status: button::Status) -> button::Style {
     let (background, text_color) = match status {
         button::Status::Hovered => (Some(INPUT_BACKGROUND.into()), TEXT_COLOR),
-        button::Status::Pressed => (Some(BORDER_COLOR.into()), TEXT_COLOR),
+        button::Status::Pressed => (Some(MODEL_MENU_HIGHLIGHT.into()), TEXT_COLOR),
         _ => (None, MUTED_COLOR),
     };
 
@@ -170,8 +144,8 @@ pub fn header_button(_theme: &Theme, status: button::Status) -> button::Style {
 
 pub fn capture_button(_theme: &Theme, status: button::Status) -> button::Style {
     let (background, text_color) = match status {
-        button::Status::Hovered => (Some(INPUT_BACKGROUND.into()), TEXT_COLOR),
-        button::Status::Pressed => (Some(BORDER_COLOR.into()), TEXT_COLOR),
+        button::Status::Hovered => (Some(INPUT_BACKGROUND.into()), ACCENT_COLOR),
+        button::Status::Pressed => (Some(MODEL_MENU_HIGHLIGHT.into()), TEXT_COLOR),
         _ => (None, MUTED_COLOR),
     };
 
@@ -189,7 +163,9 @@ pub fn capture_button(_theme: &Theme, status: button::Status) -> button::Style {
 pub fn model_picker(_theme: &Theme, status: pick_list::Status) -> pick_list::Style {
     let border_color = match status {
         pick_list::Status::Active => INPUT_BORDER_COLOR,
-        pick_list::Status::Hovered | pick_list::Status::Opened { .. } => ACCENT_COLOR,
+        pick_list::Status::Hovered | pick_list::Status::Opened { .. } => {
+            Color::from_rgb8(0x6C, 0x5C, 0xFF)
+        }
     };
 
     pick_list::Style {
@@ -207,7 +183,7 @@ pub fn model_picker(_theme: &Theme, status: pick_list::Status) -> pick_list::Sty
 
 pub fn model_menu(_theme: &Theme) -> menu::Style {
     menu::Style {
-        background: INPUT_BACKGROUND.into(),
+        background: MODEL_PICKER_BACKGROUND.into(),
         border: Border {
             color: INPUT_BORDER_COLOR,
             width: 1.0,
@@ -222,7 +198,7 @@ pub fn model_menu(_theme: &Theme) -> menu::Style {
 
 pub fn card(_theme: &Theme) -> container::Style {
     container::Style {
-        background: Some(BACKGROUND_COLOR.into()),
+        background: Some(MODEL_PICKER_BACKGROUND.into()),
         border: BORDER_STYLE,
         text_color: Some(TEXT_COLOR),
         ..Default::default()
@@ -234,7 +210,7 @@ pub fn answer_markdown() -> markdown::Style {
     style.font = ANSWER_FONT;
     style.inline_code_highlight.background = INPUT_BACKGROUND.into();
     style.inline_code_color = TEXT_COLOR;
-    style.link_color = ACCENT_COLOR;
+    style.link_color = Color::from_rgb8(0xA9, 0x9F, 0xFF);
     style
 }
 
