@@ -2,11 +2,11 @@
   <img width="350" alt="banner" src="https://github.com/user-attachments/assets/e714ec64-e4dc-4d10-845f-17a037229b07" />
 </p>
 
-```Previously "Little Owl"```
+# Ruru
 
 An app for asking questions about what you are reading or viewing, right when a question comes to mind.
 
-A linear chat thread is fundamentally a flawed medium for atomic questions.  is being built to keep each answer connected to its source, so useful explanations do not disappear into a chat thread.
+A linear chat thread is fundamentally a flawed medium for atomic questions. Ruru is being built to keep each answer connected to its source, so useful explanations do not disappear into a chat thread.
 
 ## Why
 
@@ -16,7 +16,7 @@ Ruru aims to eliminate the friction from having a question to asking it, and the
 
 ## How it works
 
-1. Highlight text and press the global hotkey. Mininm captures the selection, nearby context, and available source details such as the app, window, or document. You can also select a screen region as the subject of a question.
+1. Highlight text and press the global hotkey. Ruru captures the selection, nearby context, and available source details such as the app, window, or document. You can also select a screen region as the subject of a question.
 2. Ask in the small overlay without leaving the source. The answer appears there as it streams.
 3. The planned history will save each answer as a separate Markdown note with its provenance, so questions from the same document can be found together.
 
@@ -28,6 +28,6 @@ For example, highlighting an unfamiliar term in a PDF should give the model the 
 
 ## Architecture
 
-This is a Rust workspace with an Iced desktop UI. `-hotkey` starts a lookup; `-core` coordinates capture and the answer request; `-capture` owns the macOS Accessibility, clipboard, screenshot, and provenance code; and `-provider` defines the streaming model interface. `-app` hosts the `-ui` overlay, while `-types` holds the data shared between crates.
+This is a Rust workspace with an Iced desktop UI. `ruru-hotkey` starts a lookup; `ruru-core` coordinates capture and the answer request; `ruru-capture` owns the macOS Accessibility, clipboard, screenshot, and provenance code; and `ruru-provider` defines the streaming model interface. `ruru-app` hosts `ruru-ui`, while `ruru-types` holds the data shared between crates.
 
-The capture and overlay flow is implemented. Model integration and source-linked answer history are the next pieces of the intended app.
+The capture, overlay, and model flows are implemented. Source-linked answer history is planned.

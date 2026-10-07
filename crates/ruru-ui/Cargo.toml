@@ -1,0 +1,17 @@
+[package]
+name = "ruru-ui"
+version = "0.1.0"
+edition = "2024"
+
+# iced is the cross-platform GPU renderer (one code path on all three platforms).
+# ruru-types is the shared data vocabulary (leaf crate). The window + event source
+# live in the ruru-app host, not here.
+[dependencies]
+iced = { version = "0.14.0", features = ["tokio", "image", "markdown", "highlighter", "svg", "advanced"] }
+ruru-provider = { path = "../ruru-provider" }
+ruru-types = { path = "../ruru-types" }
+pulldown-cmark = "0.12.2"
+ratex-layout = "0.1.14"
+ratex-parser = "0.1.14"
+ratex-svg = { version = "0.1.14", features = ["standalone", "embed-fonts"] }
+ratex-types = "0.1.14"

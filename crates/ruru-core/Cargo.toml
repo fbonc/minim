@@ -1,0 +1,13 @@
+[package]
+name = "ruru-core"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+futures-channel = "0.3.31"
+futures-util = "0.3.31"
+ruru-hotkey = { path = "../ruru-hotkey" }
+ruru-provider = { path = "../ruru-provider" }
+ruru-types = { path = "../ruru-types" }
+ruru-capture = { path = "../ruru-capture"}
+tokio = { version = "1", features = ["rt"] }

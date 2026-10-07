@@ -1,0 +1,9 @@
+[package]
+name = "ruru-types"
+version = "0.1.0"
+edition = "2024"
+
+# shared data vocabulary with no dependencies, so ruru-capture,
+# ruru-core, ruru-ui, ruru-provider can all name these types without pulling in a platform
+# stack or depending on each other.
+[dependencies]

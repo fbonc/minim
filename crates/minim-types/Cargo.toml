@@ -1,9 +1,0 @@
-[package]
-name = "minim-types"
-version = "0.1.0"
-edition = "2024"
-
-# shared data vocabulary with no dependencies, so minim-capture,
-# minim-core, minim-ui, minim-provider can all name these types without pulling in a platform
-# stack or depending on each other.
-[dependencies]
