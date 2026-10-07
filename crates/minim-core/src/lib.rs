@@ -22,6 +22,7 @@ pub enum Input {
         model: ModelSelection,
     },
     AbortProviderRequest,
+    RetryProviderRequest,
     RemoveTarget,
     SelectRegion,
 }

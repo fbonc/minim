@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use futures_util::future::{Abortable, ready};
+use futures_util::future::{AbortRegistration, Abortable, ready};
 use futures_util::stream::BoxStream;
 use futures_util::{StreamExt, stream};
 use minim_capture::Capturer;
@@ -35,6 +35,7 @@ impl Core {
                 self.abort_provider_request();
                 stream::empty().boxed()
             }
+            Input::RetryProviderRequest => self.retry_provider_stream(),
             Input::RemoveTarget => {
                 self.remove_target();
                 stream::empty().boxed()
@@ -140,6 +141,35 @@ impl Core {
             })
             .boxed(),
         };
+        self.provider_outputs(provider_stream, request_id, abort_registration)
+    }
+
+    fn retry_provider_stream(self: &Arc<Self>) -> BoxStream<'static, Output> {
+        let (provider, request_id, abort_registration) = self
+            .state
+            .lock()
+            .expect("core state mutex poisoned")
+            .start_provider_retry();
+        let provider_stream = provider
+            .and_then(|provider| provider.retry_request())
+            .unwrap_or_else(|| {
+                stream::once(async {
+                    Err(ProviderError::new(
+                        "no provider request is available to retry",
+                    ))
+                })
+                .boxed()
+            });
+
+        self.provider_outputs(provider_stream, request_id, abort_registration)
+    }
+
+    fn provider_outputs(
+        self: &Arc<Self>,
+        provider_stream: ProviderStream,
+        request_id: u64,
+        abort_registration: AbortRegistration,
+    ) -> BoxStream<'static, Output> {
         let outputs = stream::unfold(
             ProviderResponseState::Streaming(provider_stream),
             |response| async move {
@@ -208,6 +238,7 @@ mod tests {
     struct RecordingProvider {
         requested_models: Mutex<Vec<String>>,
         aborted: AtomicBool,
+        retried: AtomicBool,
     }
 
     impl Provider for RecordingProvider {
@@ -228,7 +259,8 @@ mod tests {
         }
 
         fn retry_request(&self) -> Option<ProviderStream> {
-            None
+            self.retried.store(true, Ordering::SeqCst);
+            Some(stream::empty().boxed())
         }
     }
 
@@ -371,6 +403,7 @@ mod tests {
         let provider = Arc::new(RecordingProvider {
             requested_models: Mutex::new(Vec::new()),
             aborted: AtomicBool::new(false),
+            retried: AtomicBool::new(false),
         });
         let provider_id = ProviderId::new("recording");
         providers.add_provider(provider_id.clone(), provider.clone());
@@ -396,6 +429,7 @@ mod tests {
         let provider = Arc::new(RecordingProvider {
             requested_models: Mutex::new(Vec::new()),
             aborted: AtomicBool::new(false),
+            retried: AtomicBool::new(false),
         });
         let provider_id = ProviderId::new("recording");
         providers.add_provider(provider_id.clone(), provider.clone());
@@ -408,5 +442,27 @@ mod tests {
         let _outputs = core.handle_input(Input::AbortProviderRequest);
 
         assert!(provider.aborted.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn retrying_uses_the_previous_provider_request() {
+        let providers = ProviderRegistry::new();
+        let provider = Arc::new(RecordingProvider {
+            requested_models: Mutex::new(Vec::new()),
+            aborted: AtomicBool::new(false),
+            retried: AtomicBool::new(false),
+        });
+        let provider_id = ProviderId::new("recording");
+        providers.add_provider(provider_id.clone(), provider.clone());
+        let core = Arc::new(Core::new(providers, Arc::new(StubCapturer::default())));
+        let _outputs = core.start_provider_stream(
+            Some("explain".into()),
+            ModelSelection::new(provider_id, "first"),
+        );
+        core.abort_provider_request();
+
+        let _outputs = core.handle_input(Input::RetryProviderRequest);
+
+        assert!(provider.retried.load(Ordering::SeqCst));
     }
 }

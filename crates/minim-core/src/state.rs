@@ -20,7 +20,7 @@ pub(crate) struct State {
     current_capture: Option<Capture>,
     provider_request_id: u64,
     provider_abort: Option<AbortHandle>,
-    active_provider: Option<Arc<dyn Provider>>,
+    request_provider: Option<Arc<dyn Provider>>,
 }
 
 impl State {
@@ -31,6 +31,7 @@ impl State {
 
     pub(crate) fn start_capture(&mut self) -> u64 {
         self.abort_provider_request();
+        self.request_provider = None;
         self.capture_id = self.capture_id.wrapping_add(1);
         self.current_capture = None;
         self.capture_id
@@ -80,16 +81,32 @@ impl State {
         };
         let (abort, registration) = AbortHandle::new_pair();
         self.provider_abort = Some(abort);
-        self.active_provider = provider;
+        self.request_provider = provider;
         (request, self.provider_request_id, registration)
+    }
+
+    pub(crate) fn start_provider_retry(
+        &mut self,
+    ) -> (Option<Arc<dyn Provider>>, u64, AbortRegistration) {
+        self.abort_provider_request();
+        let (abort, registration) = AbortHandle::new_pair();
+        self.provider_abort = Some(abort);
+        (
+            self.request_provider.clone(),
+            self.provider_request_id,
+            registration,
+        )
     }
 
     pub(crate) fn abort_provider_request(&mut self) {
         self.provider_request_id = self.provider_request_id.wrapping_add(1);
-        if let Some(abort) = self.provider_abort.take() {
+        let request_was_active = if let Some(abort) = self.provider_abort.take() {
             abort.abort();
-        }
-        if let Some(provider) = self.active_provider.take() {
+            true
+        } else {
+            false
+        };
+        if request_was_active && let Some(provider) = &self.request_provider {
             provider.abort_request();
         }
     }
@@ -101,7 +118,6 @@ impl State {
 
         if matches!(output, Output::AnswerCompleted | Output::RequestFailed(_)) {
             self.provider_abort = None;
-            self.active_provider = None;
         }
 
         true

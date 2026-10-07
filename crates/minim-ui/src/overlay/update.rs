@@ -74,6 +74,13 @@ impl Overlay {
                 Some(Output::ProviderRequestAbortRequested)
             }
             Input::ProviderRequestAbortRequested => None,
+            Input::ProviderRequestRetryRequested
+                if self.phase == Phase::Answering && !self.answering.is_streaming() =>
+            {
+                self.answering.reset();
+                Some(Output::ProviderRequestRetryRequested)
+            }
+            Input::ProviderRequestRetryRequested => None,
             Input::BackRequested => {
                 self.phase = Phase::Prompting;
                 Some(Output::PhaseChanged(Phase::Prompting))
@@ -316,6 +323,26 @@ mod tests {
         assert!(
             overlay
                 .update(Input::ProviderRequestAbortRequested)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn retrying_clears_the_previous_answer_and_notifies_the_host() {
+        let mut overlay = Overlay::new();
+        overlay.phase = Phase::Answering;
+        overlay.update(Input::AppendAnswer("previous answer".into()));
+        overlay.update(Input::FinishAnswer);
+
+        assert_eq!(
+            overlay.update(Input::ProviderRequestRetryRequested),
+            Some(Output::ProviderRequestRetryRequested)
+        );
+        assert!(overlay.answering.answer().is_empty());
+        assert!(!overlay.answering.is_done());
+        assert!(
+            overlay
+                .update(Input::ProviderRequestRetryRequested)
                 .is_none()
         );
     }

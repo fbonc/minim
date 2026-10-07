@@ -116,6 +116,15 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
                 }
                 Task::none()
             }
+            Some(OverlayOutput::ProviderRequestRetryRequested) => {
+                if let Err(error) = state
+                    .to_core
+                    .try_send(minim_core::Input::RetryProviderRequest)
+                {
+                    eprintln!("failed to retry provider request: {error}");
+                }
+                Task::none()
+            }
             Some(OverlayOutput::LinkClicked(uri)) => {
                 println!("link clicked: {uri}");
                 Task::none()
