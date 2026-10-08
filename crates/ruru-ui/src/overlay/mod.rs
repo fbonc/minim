@@ -41,12 +41,12 @@ pub enum Output {
     ProviderRequestRetryRequested,
     CopyAnswerRequested(String),
     LinkClicked(String),
-    PhaseChanged(Phase),
+    ModeChanged(OverlayMode),
     Dismissed,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum Phase {
+pub enum OverlayMode {
     #[default]
     Prompting,
     Answering,
@@ -60,7 +60,7 @@ pub struct Overlay {
     prompting: prompting::Prompting,
     answering: answering::Answering,
     capture_ready: bool,
-    pub phase: Phase,
+    pub mode: OverlayMode,
 }
 
 impl Default for Overlay {
@@ -72,7 +72,7 @@ impl Default for Overlay {
             prompting: prompting::Prompting::new(),
             answering: answering::Answering::default(),
             capture_ready: true,
-            phase: Phase::default(),
+            mode: OverlayMode::default(),
         }
     }
 }
@@ -92,7 +92,7 @@ impl Overlay {
     }
 
     pub fn subscription(&self) -> Subscription<Input> {
-        if self.phase == Phase::Answering {
+        if self.mode == OverlayMode::Answering {
             self.answering.subscription().map(Input::Answering)
         } else {
             Subscription::none()

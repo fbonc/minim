@@ -8,7 +8,7 @@ use ruru_provider::ModelSelection;
 use ruru_types::Target;
 
 use super::style;
-use super::{Input, Overlay, Phase};
+use super::{Input, Overlay, OverlayMode};
 
 static LOGO: LazyLock<image::Handle> = LazyLock::new(|| {
     image::Handle::from_bytes(include_bytes!("../../../../assets/banner.png").as_slice())
@@ -20,12 +20,12 @@ impl Overlay {
             .selected_model
             .clone()
             .filter(|selected| available_models.contains(selected));
-        let content = match self.phase {
-            Phase::Prompting => self
+        let content = match self.mode {
+            OverlayMode::Prompting => self
                 .prompting
                 .view(available_models, selected_model, self.capture_ready)
                 .map(Input::Prompting),
-            Phase::Answering => self.answering.view().map(Input::Answering),
+            OverlayMode::Answering => self.answering.view().map(Input::Answering),
         };
 
         container(
@@ -67,7 +67,7 @@ fn header(overlay: &Overlay) -> Element<'_, Input> {
             .clip(true)
         ];
 
-        if overlay.phase == Phase::Prompting {
+        if overlay.mode == OverlayMode::Prompting {
             target = target.push(target_clear_button());
         }
 
@@ -82,7 +82,7 @@ fn header(overlay: &Overlay) -> Element<'_, Input> {
 
     let mut actions = row![].spacing(style::HEADER_ACTION_SPACING);
 
-    if overlay.phase == Phase::Answering {
+    if overlay.mode == OverlayMode::Answering {
         if overlay.answering.is_streaming() {
             actions = actions.push(abort_button());
         } else {

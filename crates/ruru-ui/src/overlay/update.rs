@@ -1,12 +1,12 @@
 use super::answering;
 use super::prompting;
-use super::{Input, Output, Overlay, Phase};
+use super::{Input, Output, Overlay, OverlayMode};
 
 impl Overlay {
     pub fn update(&mut self, input: Input) -> Option<Output> {
         match input {
             Input::Prompting(prompting::Input::SubmitRequested) if self.capture_ready => {
-                self.phase = Phase::Answering;
+                self.mode = OverlayMode::Answering;
                 self.answering.reset();
                 Some(Output::Submitted {
                     prompt: self.commit_prompt(),
@@ -35,7 +35,7 @@ impl Overlay {
                 self.visible = true;
                 self.target = None;
                 self.capture_ready = false;
-                self.phase = Phase::Prompting;
+                self.mode = OverlayMode::Prompting;
                 self.prompting.reset();
                 self.answering.reset();
                 None
@@ -48,7 +48,7 @@ impl Overlay {
                 self.target = Some(target);
                 None
             }
-            Input::RemoveTargetRequested if self.phase == Phase::Prompting => {
+            Input::RemoveTargetRequested if self.mode == OverlayMode::Prompting => {
                 self.target.take().map(|_| Output::TargetRemoved)
             }
             Input::RemoveTargetRequested => None,
@@ -69,21 +69,21 @@ impl Overlay {
                 None
             }
             Input::ProviderRequestAbortRequested
-                if self.phase == Phase::Answering && self.answering.is_streaming() =>
+                if self.mode == OverlayMode::Answering && self.answering.is_streaming() =>
             {
                 self.answering.finish();
                 Some(Output::ProviderRequestAbortRequested)
             }
             Input::ProviderRequestAbortRequested => None,
             Input::ProviderRequestRetryRequested
-                if self.phase == Phase::Answering && !self.answering.is_streaming() =>
+                if self.mode == OverlayMode::Answering && !self.answering.is_streaming() =>
             {
                 self.answering.reset();
                 Some(Output::ProviderRequestRetryRequested)
             }
             Input::ProviderRequestRetryRequested => None,
             Input::CopyAnswerRequested
-                if self.phase == Phase::Answering && self.answering.can_copy() =>
+                if self.mode == OverlayMode::Answering && self.answering.can_copy() =>
             {
                 Some(Output::CopyAnswerRequested(
                     self.answering.answer().to_owned(),
@@ -91,9 +91,9 @@ impl Overlay {
             }
             Input::CopyAnswerRequested => None,
             Input::BackRequested => {
-                self.phase = Phase::Prompting;
+                self.mode = OverlayMode::Prompting;
                 self.answering.reset();
-                Some(Output::PhaseChanged(Phase::Prompting))
+                Some(Output::ModeChanged(OverlayMode::Prompting))
             }
             Input::DismissRequested => {
                 self.visible = false;
@@ -161,7 +161,7 @@ mod tests {
                 .update(Input::Prompting(prompting::Input::SubmitRequested))
                 .is_none()
         );
-        assert_eq!(overlay.phase, Phase::Prompting);
+        assert_eq!(overlay.mode, OverlayMode::Prompting);
 
         overlay.update(Input::CaptureCompleted);
 
@@ -170,7 +170,7 @@ mod tests {
                 .update(Input::Prompting(prompting::Input::SubmitRequested))
                 .is_some()
         );
-        assert_eq!(overlay.phase, Phase::Answering);
+        assert_eq!(overlay.mode, OverlayMode::Answering);
     }
 
     #[test]
@@ -190,7 +190,7 @@ mod tests {
     fn target_cannot_be_removed_while_answering() {
         let mut overlay = Overlay::new();
         overlay.update(Input::SetTarget(text_target("selected text")));
-        overlay.phase = Phase::Answering;
+        overlay.mode = OverlayMode::Answering;
 
         assert!(overlay.update(Input::RemoveTargetRequested).is_none());
         assert!(overlay.target.is_some());
@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn showing_again_returns_to_prompting_with_the_new_target() {
         let mut overlay = Overlay::new();
-        overlay.phase = Phase::Answering;
+        overlay.mode = OverlayMode::Answering;
         overlay.answering.push_token("old answer");
         overlay.answering.fail("old error".into());
         overlay.update(Input::Prompting(prompting::Input::InputChanged(
@@ -210,7 +210,7 @@ mod tests {
         overlay.update(Input::Show);
         overlay.update(Input::SetTarget(text_target("new selection")));
 
-        assert_eq!(overlay.phase, Phase::Prompting);
+        assert_eq!(overlay.mode, OverlayMode::Prompting);
         assert!(overlay.prompting.prompt_value().is_empty());
         assert!(overlay.answering.answer().is_empty());
         assert!(overlay.answering.error().is_none());
@@ -268,14 +268,14 @@ mod tests {
             overlay.update(Input::Prompting(prompting::Input::CaptureRegionRequested)),
             Some(Output::CaptureRegionRequested)
         );
-        assert_eq!(overlay.phase, Phase::Prompting);
+        assert_eq!(overlay.mode, OverlayMode::Prompting);
         assert_eq!(overlay.prompting.prompt_value(), "what is shown?");
     }
 
     #[test]
     fn submit_moves_from_prompting_to_answering() {
         let mut overlay = Overlay::new();
-        assert_eq!(overlay.phase, Phase::Prompting);
+        assert_eq!(overlay.mode, OverlayMode::Prompting);
 
         assert!(
             overlay
@@ -283,7 +283,7 @@ mod tests {
                 .is_some()
         );
 
-        assert_eq!(overlay.phase, Phase::Answering);
+        assert_eq!(overlay.mode, OverlayMode::Answering);
     }
 
     #[test]
@@ -297,7 +297,7 @@ mod tests {
                 )))
                 .is_none()
         );
-        assert_eq!(overlay.phase, Phase::Prompting);
+        assert_eq!(overlay.mode, OverlayMode::Prompting);
     }
 
     #[test]
@@ -326,7 +326,7 @@ mod tests {
     #[test]
     fn aborting_finishes_the_partial_answer_and_notifies_the_host() {
         let mut overlay = Overlay::new();
-        overlay.phase = Phase::Answering;
+        overlay.mode = OverlayMode::Answering;
         overlay.update(Input::AppendAnswer("partial".into()));
 
         assert_eq!(
@@ -345,7 +345,7 @@ mod tests {
     #[test]
     fn retrying_clears_the_previous_answer_and_notifies_the_host() {
         let mut overlay = Overlay::new();
-        overlay.phase = Phase::Answering;
+        overlay.mode = OverlayMode::Answering;
         overlay.update(Input::AppendAnswer("previous answer".into()));
         overlay.update(Input::FinishAnswer);
 
@@ -365,7 +365,7 @@ mod tests {
     #[test]
     fn copying_a_finished_answer_sends_the_entire_answer_to_the_host() {
         let mut overlay = Overlay::new();
-        overlay.phase = Phase::Answering;
+        overlay.mode = OverlayMode::Answering;
         overlay.update(Input::AppendAnswer("complete ".into()));
         overlay.update(Input::AppendAnswer("answer".into()));
 
@@ -382,7 +382,7 @@ mod tests {
     #[test]
     fn failed_answers_cannot_be_copied() {
         let mut overlay = Overlay::new();
-        overlay.phase = Phase::Answering;
+        overlay.mode = OverlayMode::Answering;
         overlay.update(Input::AppendAnswer("partial answer".into()));
         overlay.update(Input::FailAnswer("provider failed".into()));
 
@@ -392,15 +392,15 @@ mod tests {
     #[test]
     fn back_returns_to_prompting() {
         let mut overlay = Overlay::new();
-        overlay.phase = Phase::Answering;
+        overlay.mode = OverlayMode::Answering;
         overlay.answering.push_token("old answer");
         overlay.answering.fail("old error".into());
 
         assert_eq!(
             overlay.update(Input::BackRequested),
-            Some(Output::PhaseChanged(Phase::Prompting))
+            Some(Output::ModeChanged(OverlayMode::Prompting))
         );
-        assert_eq!(overlay.phase, Phase::Prompting);
+        assert_eq!(overlay.mode, OverlayMode::Prompting);
         assert!(overlay.answering.answer().is_empty());
         assert!(overlay.answering.error().is_none());
     }

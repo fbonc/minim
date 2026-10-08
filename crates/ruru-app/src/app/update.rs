@@ -3,7 +3,7 @@ use ruru_core::Output as CoreOutput;
 use ruru_types::Target;
 use ruru_ui::main_window;
 use ruru_ui::overlay;
-use ruru_ui::{OverlayOutput, Phase};
+use ruru_ui::{OverlayMode, OverlayOutput};
 
 use super::windows::{configure_window_for_active_space, show_overlay};
 use super::{ANSWERING_HEIGHT, App, Input, PROMPTING_HEIGHT, WINDOW_WIDTH};
@@ -167,15 +167,15 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
                 println!("link clicked: {uri}");
                 Task::none()
             }
-            Some(OverlayOutput::PhaseChanged(phase)) => match phase {
-                Phase::Prompting => {
+            Some(OverlayOutput::ModeChanged(mode)) => match mode {
+                OverlayMode::Prompting => {
                     abort_provider_request(state);
                     iced_window::resize(
                         state.overlay.id,
                         iced::Size::new(WINDOW_WIDTH, PROMPTING_HEIGHT),
                     )
                 }
-                Phase::Answering => iced_window::resize(
+                OverlayMode::Answering => iced_window::resize(
                     state.overlay.id,
                     iced::Size::new(WINDOW_WIDTH, ANSWERING_HEIGHT),
                 ),
@@ -189,7 +189,7 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
         Input::CheckPromptInputFocus(id) => {
             if id == state.overlay.id
                 && state.overlay.ui.visible
-                && state.overlay.ui.phase == Phase::Prompting
+                && state.overlay.ui.mode == OverlayMode::Prompting
             {
                 state
                     .overlay

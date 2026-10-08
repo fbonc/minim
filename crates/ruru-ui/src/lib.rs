@@ -6,7 +6,7 @@ pub mod overlay;
 pub(crate) mod style;
 
 pub use overlay::Output as OverlayOutput;
-pub use overlay::{Overlay, Phase};
+pub use overlay::{Overlay, OverlayMode};
 pub use ruru_types::Target;
 
 pub fn view(
