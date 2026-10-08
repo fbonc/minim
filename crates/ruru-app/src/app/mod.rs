@@ -23,6 +23,7 @@ struct App {
     overlay: WindowHost<OverlayUi>,
     providers: ProviderRegistry,
     to_core: CoreSender,
+    current_provider_request_id: ruru_core::ProviderRequestId,
     selecting_region: bool,
 }
 
@@ -81,6 +82,7 @@ fn boot() -> (App, Task<Input>) {
             },
             providers,
             to_core,
+            current_provider_request_id: 0,
             selecting_region: false,
         },
         Task::batch(tasks),

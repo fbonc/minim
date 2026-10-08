@@ -37,6 +37,7 @@ impl Overlay {
                 self.capture_ready = false;
                 self.phase = Phase::Prompting;
                 self.prompting.reset();
+                self.answering.reset();
                 None
             }
             Input::CaptureCompleted => {
@@ -91,10 +92,12 @@ impl Overlay {
             Input::CopyAnswerRequested => None,
             Input::BackRequested => {
                 self.phase = Phase::Prompting;
+                self.answering.reset();
                 Some(Output::PhaseChanged(Phase::Prompting))
             }
             Input::DismissRequested => {
                 self.visible = false;
+                self.answering.reset();
                 Some(Output::Dismissed)
             }
         }
@@ -197,6 +200,8 @@ mod tests {
     fn showing_again_returns_to_prompting_with_the_new_target() {
         let mut overlay = Overlay::new();
         overlay.phase = Phase::Answering;
+        overlay.answering.push_token("old answer");
+        overlay.answering.fail("old error".into());
         overlay.update(Input::Prompting(prompting::Input::InputChanged(
             "old prompt".into(),
         )));
@@ -207,6 +212,8 @@ mod tests {
 
         assert_eq!(overlay.phase, Phase::Prompting);
         assert!(overlay.prompting.prompt_value().is_empty());
+        assert!(overlay.answering.answer().is_empty());
+        assert!(overlay.answering.error().is_none());
         assert!(matches!(
             overlay.target,
             Some(Target::Text(TextCapture { ref text, .. })) if text == "new selection"
@@ -386,24 +393,32 @@ mod tests {
     fn back_returns_to_prompting() {
         let mut overlay = Overlay::new();
         overlay.phase = Phase::Answering;
+        overlay.answering.push_token("old answer");
+        overlay.answering.fail("old error".into());
 
         assert_eq!(
             overlay.update(Input::BackRequested),
             Some(Output::PhaseChanged(Phase::Prompting))
         );
         assert_eq!(overlay.phase, Phase::Prompting);
+        assert!(overlay.answering.answer().is_empty());
+        assert!(overlay.answering.error().is_none());
     }
 
     #[test]
     fn close_hides_the_overlay() {
         let mut overlay = Overlay::new();
         overlay.visible = true;
+        overlay.answering.push_token("old answer");
+        overlay.answering.fail("old error".into());
 
         assert_eq!(
             overlay.update(Input::DismissRequested),
             Some(Output::Dismissed)
         );
         assert!(!overlay.visible);
+        assert!(overlay.answering.answer().is_empty());
+        assert!(overlay.answering.error().is_none());
     }
 
     #[test]

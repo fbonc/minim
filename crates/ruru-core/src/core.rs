@@ -11,7 +11,7 @@ use ruru_provider::{
 use ruru_types::{ImageCapture, Target, WindowBounds};
 
 use crate::state::State;
-use crate::{Capture, Input, Output};
+use crate::{Capture, Input, Output, ProviderRequestId};
 
 pub(crate) struct Core {
     state: Mutex<State>,
@@ -30,12 +30,16 @@ impl Core {
 
     pub(crate) fn handle_input(self: &Arc<Self>, input: Input) -> BoxStream<'static, Output> {
         match input {
-            Input::Submit { prompt, model } => self.start_provider_stream(prompt, model),
+            Input::Submit {
+                request_id,
+                prompt,
+                model,
+            } => self.start_provider_stream(request_id, prompt, model),
             Input::AbortProviderRequest => {
                 self.abort_provider_request();
                 stream::empty().boxed()
             }
-            Input::RetryProviderRequest => self.retry_provider_stream(),
+            Input::RetryProviderRequest { request_id } => self.retry_provider_stream(request_id),
             Input::RemoveTarget => {
                 self.remove_target();
                 stream::empty().boxed()
@@ -122,6 +126,7 @@ impl Core {
 
     fn start_provider_stream(
         self: &Arc<Self>,
+        output_request_id: ProviderRequestId,
         prompt: Option<String>,
         model: ModelSelection,
     ) -> BoxStream<'static, Output> {
@@ -141,10 +146,18 @@ impl Core {
             })
             .boxed(),
         };
-        self.provider_outputs(provider_stream, request_id, abort_registration)
+        self.provider_outputs(
+            provider_stream,
+            request_id,
+            output_request_id,
+            abort_registration,
+        )
     }
 
-    fn retry_provider_stream(self: &Arc<Self>) -> BoxStream<'static, Output> {
+    fn retry_provider_stream(
+        self: &Arc<Self>,
+        output_request_id: ProviderRequestId,
+    ) -> BoxStream<'static, Output> {
         let (provider, request_id, abort_registration) = self
             .state
             .lock()
@@ -161,29 +174,46 @@ impl Core {
                 .boxed()
             });
 
-        self.provider_outputs(provider_stream, request_id, abort_registration)
+        self.provider_outputs(
+            provider_stream,
+            request_id,
+            output_request_id,
+            abort_registration,
+        )
     }
 
     fn provider_outputs(
         self: &Arc<Self>,
         provider_stream: ProviderStream,
         request_id: u64,
+        output_request_id: ProviderRequestId,
         abort_registration: AbortRegistration,
     ) -> BoxStream<'static, Output> {
         let outputs = stream::unfold(
             ProviderResponseState::Streaming(provider_stream),
-            |response| async move {
+            move |response| async move {
                 match response {
                     ProviderResponseState::Streaming(mut stream) => match stream.next().await {
                         Some(Ok(ProviderOutput::TextDelta(chunk))) => Some((
-                            Output::AnswerChunk(chunk),
+                            Output::AnswerChunk {
+                                request_id: output_request_id,
+                                chunk,
+                            },
                             ProviderResponseState::Streaming(stream),
                         )),
                         Some(Err(error)) => Some((
-                            Output::RequestFailed(error.to_string()),
+                            Output::ProviderRequestFailed {
+                                request_id: output_request_id,
+                                error: error.to_string(),
+                            },
                             ProviderResponseState::Finished,
                         )),
-                        None => Some((Output::AnswerCompleted, ProviderResponseState::Finished)),
+                        None => Some((
+                            Output::AnswerCompleted {
+                                request_id: output_request_id,
+                            },
+                            ProviderResponseState::Finished,
+                        )),
                     },
                     ProviderResponseState::Finished => None,
                 }
@@ -410,6 +440,7 @@ mod tests {
         let core = Arc::new(Core::new(providers, Arc::new(StubCapturer::default())));
 
         let _outputs = core.start_provider_stream(
+            1,
             Some("explain".into()),
             ModelSelection::new(provider_id, "second"),
         );
@@ -424,6 +455,29 @@ mod tests {
     }
 
     #[test]
+    fn provider_outputs_keep_the_app_request_id() {
+        let core = Arc::new(Core::new(
+            provider_registry(),
+            Arc::new(StubCapturer::default()),
+        ));
+        let mut outputs = core.start_provider_stream(
+            42,
+            None,
+            ModelSelection::new(ProviderId::new("mock"), "mock"),
+        );
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_time()
+            .build()
+            .expect("test runtime should start");
+
+        let output = runtime
+            .block_on(outputs.next())
+            .expect("provider should produce output");
+
+        assert!(matches!(output, Output::AnswerChunk { request_id: 42, .. }));
+    }
+
+    #[test]
     fn aborting_stops_the_active_provider_request() {
         let providers = ProviderRegistry::new();
         let provider = Arc::new(RecordingProvider {
@@ -435,6 +489,7 @@ mod tests {
         providers.add_provider(provider_id.clone(), provider.clone());
         let core = Arc::new(Core::new(providers, Arc::new(StubCapturer::default())));
         let _outputs = core.start_provider_stream(
+            1,
             Some("explain".into()),
             ModelSelection::new(provider_id, "first"),
         );
@@ -456,12 +511,13 @@ mod tests {
         providers.add_provider(provider_id.clone(), provider.clone());
         let core = Arc::new(Core::new(providers, Arc::new(StubCapturer::default())));
         let _outputs = core.start_provider_stream(
+            1,
             Some("explain".into()),
             ModelSelection::new(provider_id, "first"),
         );
         core.abort_provider_request();
 
-        let _outputs = core.handle_input(Input::RetryProviderRequest);
+        let _outputs = core.handle_input(Input::RetryProviderRequest { request_id: 2 });
 
         assert!(provider.retried.load(Ordering::SeqCst));
     }

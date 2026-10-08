@@ -46,6 +46,7 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
         },
         Input::Core(output) => match output {
             CoreOutput::ShowRequested { focused_window } => {
+                advance_provider_request_id(state);
                 let _ = state.overlay.ui.update(overlay::Input::Show);
                 show_overlay(state.overlay.id, focused_window)
             }
@@ -75,12 +76,25 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
                 iced_window::set_mode(state.overlay.id, iced_window::Mode::Windowed)
                     .chain(iced_window::gain_focus(state.overlay.id))
             }
-            CoreOutput::AnswerChunk(chunk) => {
-                let _ = state.overlay.ui.update(overlay::Input::AppendAnswer(chunk));
+            CoreOutput::AnswerChunk { request_id, chunk } => {
+                if state.current_provider_request_id == request_id {
+                    let _ = state.overlay.ui.update(overlay::Input::AppendAnswer(chunk));
+                }
                 Task::none()
             }
-            CoreOutput::AnswerCompleted => {
-                let _ = state.overlay.ui.update(overlay::Input::FinishAnswer);
+            CoreOutput::AnswerCompleted { request_id } => {
+                if state.current_provider_request_id == request_id {
+                    advance_provider_request_id(state);
+                    let _ = state.overlay.ui.update(overlay::Input::FinishAnswer);
+                }
+                Task::none()
+            }
+            CoreOutput::ProviderRequestFailed { request_id, error } => {
+                if state.current_provider_request_id == request_id {
+                    advance_provider_request_id(state);
+                    eprintln!("provider request failed: {error}");
+                    let _ = state.overlay.ui.update(overlay::Input::FailAnswer(error));
+                }
                 Task::none()
             }
             CoreOutput::RequestFailed(error) => {
@@ -99,9 +113,18 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
                     ));
                     return Task::none();
                 };
-                let _ = state
-                    .to_core
-                    .try_send(ruru_core::Input::Submit { prompt, model });
+                let request_id = advance_provider_request_id(state);
+                if let Err(error) = state.to_core.try_send(ruru_core::Input::Submit {
+                    request_id,
+                    prompt,
+                    model,
+                }) {
+                    advance_provider_request_id(state);
+                    let _ = state.overlay.ui.update(overlay::Input::FailAnswer(format!(
+                        "failed to start provider request: {error}"
+                    )));
+                    return Task::none();
+                }
                 iced_window::resize(
                     state.overlay.id,
                     iced::Size::new(WINDOW_WIDTH, ANSWERING_HEIGHT),
@@ -122,20 +145,20 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
                     .chain(Task::done(Input::BeginRegionSelection))
             }
             Some(OverlayOutput::ProviderRequestAbortRequested) => {
-                if let Err(error) = state
-                    .to_core
-                    .try_send(ruru_core::Input::AbortProviderRequest)
-                {
-                    eprintln!("failed to abort provider request: {error}");
-                }
+                abort_provider_request(state);
                 Task::none()
             }
             Some(OverlayOutput::ProviderRequestRetryRequested) => {
+                let request_id = advance_provider_request_id(state);
                 if let Err(error) = state
                     .to_core
-                    .try_send(ruru_core::Input::RetryProviderRequest)
+                    .try_send(ruru_core::Input::RetryProviderRequest { request_id })
                 {
+                    advance_provider_request_id(state);
                     eprintln!("failed to retry provider request: {error}");
+                    let _ = state.overlay.ui.update(overlay::Input::FailAnswer(format!(
+                        "failed to retry provider request: {error}"
+                    )));
                 }
                 Task::none()
             }
@@ -145,16 +168,20 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
                 Task::none()
             }
             Some(OverlayOutput::PhaseChanged(phase)) => match phase {
-                Phase::Prompting => iced_window::resize(
-                    state.overlay.id,
-                    iced::Size::new(WINDOW_WIDTH, PROMPTING_HEIGHT),
-                ),
+                Phase::Prompting => {
+                    abort_provider_request(state);
+                    iced_window::resize(
+                        state.overlay.id,
+                        iced::Size::new(WINDOW_WIDTH, PROMPTING_HEIGHT),
+                    )
+                }
                 Phase::Answering => iced_window::resize(
                     state.overlay.id,
                     iced::Size::new(WINDOW_WIDTH, ANSWERING_HEIGHT),
                 ),
             },
             Some(OverlayOutput::Dismissed) => {
+                abort_provider_request(state);
                 iced_window::set_mode(state.overlay.id, iced_window::Mode::Hidden)
             }
             None => Task::none(),
@@ -185,4 +212,19 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
             }
         }
     }
+}
+
+fn abort_provider_request(state: &mut App) {
+    advance_provider_request_id(state);
+    if let Err(error) = state
+        .to_core
+        .try_send(ruru_core::Input::AbortProviderRequest)
+    {
+        eprintln!("failed to abort provider request: {error}");
+    }
+}
+
+fn advance_provider_request_id(state: &mut App) -> ruru_core::ProviderRequestId {
+    state.current_provider_request_id = state.current_provider_request_id.wrapping_add(1);
+    state.current_provider_request_id
 }

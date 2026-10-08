@@ -14,15 +14,19 @@ mod hotkey;
 mod state;
 
 pub type Sender = mpsc::Sender<Input>;
+pub type ProviderRequestId = u64;
 
 #[derive(Debug, Clone)]
 pub enum Input {
     Submit {
+        request_id: ProviderRequestId,
         prompt: Option<String>,
         model: ModelSelection,
     },
     AbortProviderRequest,
-    RetryProviderRequest,
+    RetryProviderRequest {
+        request_id: ProviderRequestId,
+    },
     RemoveTarget,
     SelectRegion,
 }
@@ -35,8 +39,17 @@ pub enum Output {
     CaptureCompleted,
     TargetCaptured(Target),
     RegionSelectionFinished(Result<Option<ImageCapture>, String>),
-    AnswerChunk(String),
-    AnswerCompleted,
+    AnswerChunk {
+        request_id: ProviderRequestId,
+        chunk: String,
+    },
+    AnswerCompleted {
+        request_id: ProviderRequestId,
+    },
+    ProviderRequestFailed {
+        request_id: ProviderRequestId,
+        error: String,
+    },
     RequestFailed(String),
 }
 

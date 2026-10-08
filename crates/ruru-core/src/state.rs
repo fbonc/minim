@@ -116,7 +116,10 @@ impl State {
             return false;
         }
 
-        if matches!(output, Output::AnswerCompleted | Output::RequestFailed(_)) {
+        if matches!(
+            output,
+            Output::AnswerCompleted { .. } | Output::ProviderRequestFailed { .. }
+        ) {
             self.provider_abort = None;
         }
 
@@ -291,8 +294,20 @@ mod tests {
 
         assert!(first_abort.is_aborted());
         assert_ne!(first_id, second_id);
-        assert!(!state.accept_provider_output(first_id, &Output::AnswerChunk("stale".into())));
-        assert!(state.accept_provider_output(second_id, &Output::AnswerChunk("current".into())));
+        assert!(!state.accept_provider_output(
+            first_id,
+            &Output::AnswerChunk {
+                request_id: 1,
+                chunk: "stale".into(),
+            }
+        ));
+        assert!(state.accept_provider_output(
+            second_id,
+            &Output::AnswerChunk {
+                request_id: 2,
+                chunk: "current".into(),
+            }
+        ));
     }
 
     #[test]
@@ -304,7 +319,13 @@ mod tests {
         state.start_capture();
 
         assert!(abort.is_aborted());
-        assert!(!state.accept_provider_output(request_id, &Output::AnswerChunk("stale".into())));
+        assert!(!state.accept_provider_output(
+            request_id,
+            &Output::AnswerChunk {
+                request_id: 1,
+                chunk: "stale".into(),
+            }
+        ));
     }
 
     #[test]
@@ -312,7 +333,15 @@ mod tests {
         let mut state = State::default();
         let (_, request_id, _) = state.start_provider_request(None, None);
 
-        assert!(state.accept_provider_output(request_id, &Output::AnswerCompleted));
-        assert!(!state.accept_provider_output(request_id, &Output::AnswerChunk("late".into())));
+        assert!(
+            state.accept_provider_output(request_id, &Output::AnswerCompleted { request_id: 1 })
+        );
+        assert!(!state.accept_provider_output(
+            request_id,
+            &Output::AnswerChunk {
+                request_id: 1,
+                chunk: "late".into(),
+            }
+        ));
     }
 }
