@@ -2,13 +2,14 @@
   <img width="350" alt="banner" src="https://github.com/user-attachments/assets/e714ec64-e4dc-4d10-845f-17a037229b07" />
 </p>
 
-# Ruru
+---
 
-An app for asking questions about what you are reading or viewing, right when a question comes to mind.
-
-A linear chat thread is fundamentally a flawed medium for atomic questions. Ruru is being built to keep each answer connected to its source, so useful explanations do not disappear into a chat thread.
+<p align="center">
+An app for asking questions right when they come to mind.
+</p>
 
 ## Why
+A linear chat thread is fundamentally a flawed medium for atomic questions. Ruru is being built to keep each answer connected to its source, so useful explanations do not disappear into a chat thread.
 
 Copying something into a chat loses the surrounding context. Switching apps interrupts the question, and small, unrelated answers get buried in a long conversation. This is especially awkward when reading a paper or another document you cannot edit: a term needs a quick explanation, but asking about it takes you away from the page.
 
@@ -29,5 +30,3 @@ For example, highlighting an unfamiliar term in a PDF should give the model the 
 ## Architecture
 
 This is a Rust workspace with an Iced desktop UI. `ruru-hotkey` starts a lookup; `ruru-core` coordinates capture and the answer request; `ruru-capture` owns the macOS Accessibility, clipboard, screenshot, and provenance code; and `ruru-provider` defines the streaming model interface. `ruru-app` hosts `ruru-ui`, while `ruru-types` holds the data shared between crates.
-
-The capture, overlay, and model flows are implemented. Source-linked answer history is planned.
