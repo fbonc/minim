@@ -139,6 +139,7 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
                 }
                 Task::none()
             }
+            Some(OverlayOutput::CopyAnswerRequested(answer)) => iced::clipboard::write(answer),
             Some(OverlayOutput::LinkClicked(uri)) => {
                 println!("link clicked: {uri}");
                 Task::none()

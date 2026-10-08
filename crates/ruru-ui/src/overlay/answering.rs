@@ -45,12 +45,25 @@ impl Answering {
         *self = Self::default();
     }
 
+    pub(super) fn answer(&self) -> &str {
+        &self.answer
+    }
+
+    #[cfg(test)]
+    pub fn is_done(&self) -> bool {
+        self.done
+    }
+
     pub fn error(&self) -> Option<&str> {
         self.error.as_deref()
     }
 
     pub(super) fn is_streaming(&self) -> bool {
         !self.done && self.error.is_none()
+    }
+
+    pub(super) fn can_copy(&self) -> bool {
+        self.done && self.error.is_none() && !self.answer.is_empty()
     }
 
     pub fn subscription(&self) -> Subscription<Input> {
@@ -115,17 +128,6 @@ impl Answering {
 #[cfg(test)]
 mod tests {
     use super::*;
-    impl Answering {
-                #[cfg(test)]
-        pub fn answer(&self) -> &str {
-            &self.answer
-        }
-
-        #[cfg(test)]
-        pub fn is_done(&self) -> bool {
-            self.done
-        }
-    }
 
     #[test]
     fn streamed_tokens_update_the_source_and_markdown() {

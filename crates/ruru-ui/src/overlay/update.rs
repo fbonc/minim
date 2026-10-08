@@ -81,6 +81,14 @@ impl Overlay {
                 Some(Output::ProviderRequestRetryRequested)
             }
             Input::ProviderRequestRetryRequested => None,
+            Input::CopyAnswerRequested
+                if self.phase == Phase::Answering && self.answering.can_copy() =>
+            {
+                Some(Output::CopyAnswerRequested(
+                    self.answering.answer().to_owned(),
+                ))
+            }
+            Input::CopyAnswerRequested => None,
             Input::BackRequested => {
                 self.phase = Phase::Prompting;
                 Some(Output::PhaseChanged(Phase::Prompting))
@@ -345,6 +353,33 @@ mod tests {
                 .update(Input::ProviderRequestRetryRequested)
                 .is_none()
         );
+    }
+
+    #[test]
+    fn copying_a_finished_answer_sends_the_entire_answer_to_the_host() {
+        let mut overlay = Overlay::new();
+        overlay.phase = Phase::Answering;
+        overlay.update(Input::AppendAnswer("complete ".into()));
+        overlay.update(Input::AppendAnswer("answer".into()));
+
+        assert!(overlay.update(Input::CopyAnswerRequested).is_none());
+
+        overlay.update(Input::FinishAnswer);
+
+        assert_eq!(
+            overlay.update(Input::CopyAnswerRequested),
+            Some(Output::CopyAnswerRequested("complete answer".into()))
+        );
+    }
+
+    #[test]
+    fn failed_answers_cannot_be_copied() {
+        let mut overlay = Overlay::new();
+        overlay.phase = Phase::Answering;
+        overlay.update(Input::AppendAnswer("partial answer".into()));
+        overlay.update(Input::FailAnswer("provider failed".into()));
+
+        assert!(overlay.update(Input::CopyAnswerRequested).is_none());
     }
 
     #[test]
