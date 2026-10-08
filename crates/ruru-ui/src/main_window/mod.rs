@@ -7,6 +7,7 @@ pub enum Input {
     Show,
     DismissRequested,
     SettingsRequested,
+    BackRequested,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
