@@ -11,6 +11,7 @@ impl MainWindow {
                 self.visible = false;
                 Some(Output::Dismissed)
             }
+            Input::SettingsRequested => None,
         }
     }
 }
