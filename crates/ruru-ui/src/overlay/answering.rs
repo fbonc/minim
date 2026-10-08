@@ -45,16 +45,6 @@ impl Answering {
         *self = Self::default();
     }
 
-    #[cfg(test)]
-    pub fn answer(&self) -> &str {
-        &self.answer
-    }
-
-    #[cfg(test)]
-    pub fn is_done(&self) -> bool {
-        self.done
-    }
-
     pub fn error(&self) -> Option<&str> {
         self.error.as_deref()
     }
@@ -125,6 +115,17 @@ impl Answering {
 #[cfg(test)]
 mod tests {
     use super::*;
+    impl Answering {
+                #[cfg(test)]
+        pub fn answer(&self) -> &str {
+            &self.answer
+        }
+
+        #[cfg(test)]
+        pub fn is_done(&self) -> bool {
+            self.done
+        }
+    }
 
     #[test]
     fn streamed_tokens_update_the_source_and_markdown() {
