@@ -1,11 +1,12 @@
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use base64::Engine;
 use eventsource_stream::Eventsource;
-use futures_util::future::Abortable;
+use futures_util::future::{Abortable, BoxFuture};
 use futures_util::{StreamExt, stream};
 use ruru_types::{ImageCapture, Target};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::types::RequestAbortController;
@@ -36,19 +37,23 @@ pub struct OpenAiProvider {
     api_key: Arc<str>,
     models: Vec<String>,
     endpoint: Arc<str>,
+    models_endpoint: Arc<str>,
     request_abort: RequestAbortController,
     last_request: Arc<Mutex<Option<(String, ProviderRequest)>>>,
 }
 
 impl OpenAiProvider {
     pub fn new(config: OpenAiConfig) -> Self {
-        let endpoint = format!("{}/v1/responses", config.base_url.trim_end_matches('/'));
+        let base_url = config.base_url.trim_end_matches('/');
+        let endpoint = format!("{base_url}/v1/responses");
+        let models_endpoint = format!("{base_url}/v1/models");
 
         Self {
             client: reqwest::Client::new(),
             api_key: config.api_key.into(),
             models: config.models,
             endpoint: endpoint.into(),
+            models_endpoint: models_endpoint.into(),
             request_abort: RequestAbortController::default(),
             last_request: Arc::default(),
         }
@@ -92,8 +97,49 @@ impl OpenAiProvider {
 }
 
 impl Provider for OpenAiProvider {
-    fn available_models(&self) -> Vec<String> {
+    fn configured_models(&self) -> Vec<String> {
         self.models.clone()
+    }
+
+    fn discover_models(&self) -> BoxFuture<'_, Result<Vec<String>, ProviderError>> {
+        Box::pin(async move {
+            let response = self
+                .client
+                .get(self.models_endpoint.as_ref())
+                .bearer_auth(self.api_key.as_ref())
+                .timeout(Duration::from_secs(10))
+                .send()
+                .await
+                .map_err(|error| {
+                    ProviderError::new(format!("OpenAI model discovery failed: {error}"))
+                })?;
+
+            let status = response.status();
+            if !status.is_success() {
+                let body = response.text().await.map_err(|error| {
+                    ProviderError::new(format!("failed to read OpenAI error response: {error}"))
+                })?;
+                return Err(api_error(status, &body));
+            }
+
+            let response = response.json::<ModelsResponse>().await.map_err(|error| {
+                ProviderError::new(format!("invalid OpenAI models response: {error}"))
+            })?;
+            let mut models = response
+                .data
+                .into_iter()
+                .map(|model| model.id)
+                .filter(|id| supports_text_and_images(id))
+                .collect::<Vec<_>>();
+            models.sort_unstable();
+            models.dedup();
+            if models.is_empty() {
+                return Err(ProviderError::new(
+                    "OpenAI returned no compatible text-and-image models",
+                ));
+            }
+            Ok(models)
+        })
     }
 
     fn stream(&self, model: &str, request: ProviderRequest) -> ProviderStream {
@@ -131,6 +177,58 @@ impl Provider for OpenAiProvider {
 
         request.map(|(model, request)| self.stream(&model, request))
     }
+}
+
+#[derive(Deserialize)]
+struct ModelsResponse {
+    data: Vec<ModelEntry>,
+}
+
+#[derive(Deserialize)]
+struct ModelEntry {
+    id: String,
+}
+
+fn supports_text_and_images(id: &str) -> bool {
+    // The models endpoint omits input modalities, so use supported model families.
+    let supported_family = [
+        "gpt-4o",
+        "gpt-4.1",
+        "gpt-4-turbo",
+        "gpt-5",
+        "gpt-6",
+        "o1",
+        "o3",
+        "o4",
+    ]
+    .iter()
+    .any(|family| {
+        id.strip_prefix(family).is_some_and(|suffix| {
+            suffix.is_empty() || suffix.starts_with('-') || suffix.starts_with('.')
+        })
+    });
+    let unsupported_variant = [
+        "audio",
+        "realtime",
+        "transcribe",
+        "tts",
+        "image",
+        "search",
+        "codex",
+        "instruct",
+        "moderation",
+        "computer",
+        "deep-research",
+        "chat",
+    ]
+    .iter()
+    .any(|variant| id.contains(variant));
+
+    supported_family
+        && !unsupported_variant
+        && !id.starts_with("o1-mini")
+        && !id.starts_with("o1-preview")
+        && !id.starts_with("o3-mini")
 }
 
 #[derive(Serialize)]
@@ -363,6 +461,35 @@ mod tests {
     }
 
     #[test]
+    fn keeps_text_and_image_response_models() {
+        for id in [
+            "gpt-4o",
+            "gpt-4.1-mini",
+            "gpt-5.6-terra",
+            "gpt-6.1-sol",
+            "o1",
+            "o3",
+            "o4-mini",
+        ] {
+            assert!(supports_text_and_images(id), "{id}");
+        }
+        for id in [
+            "gpt-3.5-turbo",
+            "gpt-4o-audio-preview",
+            "gpt-4o-mini-search-preview",
+            "gpt-5-codex",
+            "gpt-5-chat-latest",
+            "gpt-image-1",
+            "o1-mini",
+            "o1-preview",
+            "o3-mini",
+            "text-embedding-3-large",
+        ] {
+            assert!(!supports_text_and_images(id), "{id}");
+        }
+    }
+
+    #[test]
     fn retries_the_last_request() {
         let provider = OpenAiProvider::new(OpenAiConfig {
             api_key: "test-key".into(),
@@ -416,6 +543,51 @@ mod tests {
                 .to_ascii_lowercase()
                 .contains("authorization: bearer test-key")
         );
+    }
+
+    #[tokio::test]
+    async fn discovers_models_with_the_configured_api_key() {
+        let body = r#"{"object":"list","data":[{"id":"gpt-4o"},{"id":"gpt-image-1"},{"id":"o4-mini"},{"id":"gpt-4o"}]}"#;
+        let (base_url, received) = serve_once(200, "application/json", body).await;
+        let provider = OpenAiProvider::new(OpenAiConfig {
+            api_key: "test-key".into(),
+            models: vec!["configured-fallback".into()],
+            base_url,
+        });
+
+        let models = provider.discover_models().await.expect("discover models");
+        let received = received.await.expect("server task");
+
+        assert_eq!(models, vec!["gpt-4o", "o4-mini"]);
+        assert!(received.starts_with("GET /v1/models HTTP/1.1"));
+        assert!(
+            received
+                .to_ascii_lowercase()
+                .contains("authorization: bearer test-key")
+        );
+    }
+
+    #[tokio::test]
+    async fn reports_model_discovery_errors() {
+        let body = r#"{"error":{"message":"invalid API key"}}"#;
+        let (base_url, received) = serve_once(401, "application/json", body).await;
+        let provider = OpenAiProvider::new(OpenAiConfig {
+            api_key: "bad-key".into(),
+            models: vec!["configured-fallback".into()],
+            base_url,
+        });
+
+        let error = provider
+            .discover_models()
+            .await
+            .expect_err("discovery should fail");
+        received.await.expect("server task");
+
+        assert_eq!(
+            error,
+            ProviderError::new("OpenAI API request failed (401 Unauthorized): invalid API key")
+        );
+        assert_eq!(provider.configured_models(), vec!["configured-fallback"]);
     }
 
     #[tokio::test]

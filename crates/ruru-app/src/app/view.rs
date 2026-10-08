@@ -5,9 +5,9 @@ use super::{App, Input};
 
 pub(super) fn view(state: &App, id: iced_window::Id) -> Element<'_, Input> {
     if id == state.overlay.id {
-        let available_models = state.providers.available_models();
+        let configured_models = state.providers.configured_models();
 
-        mouse_area(ruru_ui::view(&state.overlay.ui, available_models).map(Input::Overlay))
+        mouse_area(ruru_ui::view(&state.overlay.ui, configured_models).map(Input::Overlay))
             .on_press(Input::DragWindow)
             .into()
     } else if id == state.main_window.id {

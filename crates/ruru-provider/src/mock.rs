@@ -2,6 +2,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use futures_util::future::Abortable;
+use futures_util::future::BoxFuture;
 use futures_util::{StreamExt, stream};
 use ruru_types::Target;
 
@@ -94,8 +95,12 @@ impl Default for MockProvider {
 }
 
 impl Provider for MockProvider {
-    fn available_models(&self) -> Vec<String> {
+    fn configured_models(&self) -> Vec<String> {
         vec!["mock".to_owned()]
+    }
+
+    fn discover_models(&self) -> BoxFuture<'_, Result<Vec<String>, crate::ProviderError>> {
+        Box::pin(async { Ok(self.configured_models()) })
     }
 
     fn stream(&self, model: &str, request: ProviderRequest) -> ProviderStream {

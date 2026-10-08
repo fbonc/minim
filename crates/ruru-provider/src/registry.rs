@@ -41,7 +41,7 @@ impl ProviderRegistry {
             .cloned()
     }
 
-    pub fn available_models(&self) -> Vec<ModelSelection> {
+    pub fn configured_models(&self) -> Vec<ModelSelection> {
         let providers = self
             .providers
             .read()
@@ -53,7 +53,7 @@ impl ProviderRegistry {
             .into_iter()
             .flat_map(|(id, provider)| {
                 provider
-                    .available_models()
+                    .configured_models()
                     .into_iter()
                     .map(move |model| ModelSelection::new(id.clone(), model))
             })
@@ -81,7 +81,7 @@ mod tests {
             Arc::new(MockProvider::new(Duration::ZERO)),
         );
 
-        let models = shared_registry.available_models();
+        let models = shared_registry.configured_models();
 
         assert_eq!(
             models,
@@ -89,7 +89,7 @@ mod tests {
         );
         assert!(shared_registry.resolve(&models[0]).is_some());
         registry.remove_provider(&provider_id);
-        assert!(shared_registry.available_models().is_empty());
+        assert!(shared_registry.configured_models().is_empty());
         assert!(shared_registry.resolve(&models[0]).is_none());
     }
 }

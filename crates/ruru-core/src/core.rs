@@ -272,8 +272,14 @@ mod tests {
     }
 
     impl Provider for RecordingProvider {
-        fn available_models(&self) -> Vec<String> {
+        fn configured_models(&self) -> Vec<String> {
             vec!["first".into(), "second".into()]
+        }
+
+        fn discover_models(
+            &self,
+        ) -> futures_util::future::BoxFuture<'_, Result<Vec<String>, ProviderError>> {
+            Box::pin(async { Ok(self.configured_models()) })
         }
 
         fn stream(&self, model: &str, _request: ProviderRequest) -> ProviderStream {

@@ -11,11 +11,11 @@ pub(super) fn load_providers() -> (ProviderRegistry, Option<ModelSelection>) {
         AppConfig::default()
     });
     let providers = providers_from_config(&config, &KeychainCredentialStore::default());
-    let available_models = providers.available_models();
+    let configured_models = providers.configured_models();
     let selected_model = config
         .selected_model
-        .filter(|model| available_models.contains(model))
-        .or_else(|| available_models.into_iter().next());
+        .filter(|model| configured_models.contains(model))
+        .or_else(|| configured_models.into_iter().next());
 
     (providers, selected_model)
 }
@@ -92,7 +92,7 @@ mod tests {
         let providers = providers_from_config(&config, &TestCredentials(Some("test-key".into())));
 
         assert_eq!(
-            providers.available_models(),
+            providers.configured_models(),
             vec![ModelSelection::new(provider_id, "gpt-test")]
         );
     }
@@ -112,6 +112,6 @@ mod tests {
 
         let providers = providers_from_config(&config, &TestCredentials(None));
 
-        assert!(providers.available_models().is_empty());
+        assert!(providers.configured_models().is_empty());
     }
 }

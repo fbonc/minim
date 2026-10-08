@@ -105,8 +105,8 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
         },
         Input::Overlay(input) => match state.overlay.ui.update(input) {
             Some(OverlayOutput::Submitted { prompt, model }) => {
-                let available_models = state.providers.available_models();
-                let Some(model) = model.filter(|selected| available_models.contains(selected))
+                let configured_models = state.providers.configured_models();
+                let Some(model) = model.filter(|selected| configured_models.contains(selected))
                 else {
                     let _ = state.overlay.ui.update(overlay::Input::FailAnswer(
                         "no available model selected".into(),

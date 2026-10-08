@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use super::error::ProviderError;
 use futures_core::Stream;
-use futures_util::future::{AbortHandle, AbortRegistration};
+use futures_util::future::{AbortHandle, AbortRegistration, BoxFuture};
 use serde::{Deserialize, Serialize};
 
 use ruru_types::{ContextCapture, Target};
@@ -66,7 +66,9 @@ pub enum ProviderOutput {
 }
 
 pub trait Provider: Send + Sync {
-    fn available_models(&self) -> Vec<String>;
+    fn configured_models(&self) -> Vec<String>;
+
+    fn discover_models(&self) -> BoxFuture<'_, Result<Vec<String>, ProviderError>>;
 
     fn stream(&self, model: &str, request: ProviderRequest) -> ProviderStream;
 
