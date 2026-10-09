@@ -1,4 +1,5 @@
-use iced::Color;
+use iced::widget::scrollable;
+use iced::{Border, Color, Theme};
 
 pub const TEXT_COLOR: Color = Color::from_rgb8(0xEE, 0xEB, 0xFF);
 
@@ -21,3 +22,11 @@ pub const SCROLLER_COLOR: Color = Color::from_rgb8(0x8C, 0x87, 0xA3);
 pub const BORDER_COLOR: Color = Color::from_rgb8(0x34, 0x30, 0x4A);
 
 pub const SCROLLBAR_WIDTH: f32 = 6.0;
+
+pub fn scroll(theme: &Theme, status: scrollable::Status) -> scrollable::Style {
+    let mut base = scrollable::default(theme, status);
+    base.vertical_rail.background = None;
+    base.vertical_rail.border = Border::default();
+    base.vertical_rail.scroller.background = SCROLLER_COLOR.into();
+    base
+}

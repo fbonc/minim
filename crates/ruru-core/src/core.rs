@@ -5,22 +5,21 @@ use futures_util::future::{AbortRegistration, Abortable, ready};
 use futures_util::stream::BoxStream;
 use futures_util::{StreamExt, stream};
 use ruru_capture::Capturer;
-use ruru_provider::{
-    ModelSelection, ProviderError, ProviderOutput, ProviderRegistry, ProviderStream,
-};
-use ruru_types::{ImageCapture, Target, WindowBounds};
+use ruru_provider::{ProviderError, ProviderOutput, ProviderStream};
+use ruru_types::{ImageCapture, ModelSelection, Target, WindowBounds};
 
+use crate::providers::Providers;
 use crate::state::State;
 use crate::{Capture, Input, Output, ProviderRequestId};
 
 pub(crate) struct Core {
     state: Mutex<State>,
-    providers: ProviderRegistry,
+    providers: Providers,
     capturer: Arc<dyn Capturer>,
 }
 
 impl Core {
-    pub(crate) fn new(providers: ProviderRegistry, capturer: Arc<dyn Capturer>) -> Self {
+    pub(crate) fn new(providers: Providers, capturer: Arc<dyn Capturer>) -> Self {
         Self {
             state: Mutex::new(State::default()),
             providers,
@@ -34,7 +33,21 @@ impl Core {
                 request_id,
                 prompt,
                 model,
-            } => self.start_provider_stream(request_id, prompt, model),
+            } => {
+                let Some(model) =
+                    model.filter(|model| self.providers.configured_models().contains(model))
+                else {
+                    self.forget_provider_request();
+                    return stream::once(async move {
+                        Output::ProviderRequestFailed {
+                            request_id,
+                            error: "no available model selected".into(),
+                        }
+                    })
+                    .boxed();
+                };
+                self.start_provider_stream(request_id, prompt, model)
+            }
             Input::AbortProviderRequest => {
                 self.abort_provider_request();
                 stream::empty().boxed()
@@ -56,6 +69,11 @@ impl Core {
                 })
                 .boxed()
             }
+            Input::DiscoverModels(_)
+            | Input::SaveKey(_, _)
+            | Input::RemoveKey(_)
+            | Input::SetModel { .. }
+            | Input::SelectModel(_) => unreachable!("settings inputs are handled by Settings"),
         }
     }
 
@@ -236,6 +254,13 @@ impl Core {
             .abort_provider_request();
     }
 
+    pub(crate) fn forget_provider_request(&self) {
+        self.state
+            .lock()
+            .expect("core state mutex poisoned")
+            .forget_provider_request();
+    }
+
     fn accept_provider_output(&self, request_id: u64, output: &Output) -> bool {
         self.state
             .lock()
@@ -256,8 +281,10 @@ enum ProviderResponseState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ruru_provider::{MockProvider, Provider, ProviderId, ProviderRequest};
-    use ruru_types::{ContextCapture, Provenance, TextCapture, TextCaptureMethod, WindowBounds};
+    use ruru_provider::{MockProvider, Provider, ProviderRequest};
+    use ruru_types::{
+        ContextCapture, Provenance, ProviderId, TextCapture, TextCaptureMethod, WindowBounds,
+    };
     use std::sync::atomic::{AtomicBool, Ordering};
 
     #[derive(Default)]
@@ -351,15 +378,15 @@ mod tests {
         }
     }
 
-    fn provider_registry() -> ProviderRegistry {
-        let providers = ProviderRegistry::new();
-        providers.add_provider(ProviderId::new("mock"), Arc::new(MockProvider::default()));
+    fn test_providers() -> Providers {
+        let providers = Providers::new();
+        providers.insert(ProviderId::new("mock"), Arc::new(MockProvider::default()));
         providers
     }
 
     #[test]
     fn capture_orchestrates_and_commits_capture_data() {
-        let core = Core::new(provider_registry(), Arc::new(StubCapturer::default()));
+        let core = Core::new(test_providers(), Arc::new(StubCapturer::default()));
 
         let mut initial_bounds = None;
         let mut initial_target = None;
@@ -405,7 +432,7 @@ mod tests {
     fn requests_the_overlay_before_completing_context_capture() {
         let context_completed = Arc::new(AtomicBool::new(false));
         let core = Core::new(
-            provider_registry(),
+            test_providers(),
             Arc::new(StubCapturer {
                 context_completed: Some(Arc::clone(&context_completed)),
             }),
@@ -418,7 +445,7 @@ mod tests {
 
     #[test]
     fn region_selection_replaces_the_committed_target() {
-        let core = Core::new(provider_registry(), Arc::new(StubCapturer::default()));
+        let core = Core::new(test_providers(), Arc::new(StubCapturer::default()));
         core.capture(|_, _| {});
 
         let selected = core.select_region().expect("region capture succeeds");
@@ -435,14 +462,14 @@ mod tests {
 
     #[test]
     fn routes_each_request_using_its_model_selection() {
-        let providers = ProviderRegistry::new();
+        let providers = Providers::new();
         let provider = Arc::new(RecordingProvider {
             requested_models: Mutex::new(Vec::new()),
             aborted: AtomicBool::new(false),
             retried: AtomicBool::new(false),
         });
         let provider_id = ProviderId::new("recording");
-        providers.add_provider(provider_id.clone(), provider.clone());
+        providers.insert(provider_id.clone(), provider.clone());
         let core = Arc::new(Core::new(providers, Arc::new(StubCapturer::default())));
 
         let _outputs = core.start_provider_stream(
@@ -463,7 +490,7 @@ mod tests {
     #[test]
     fn provider_outputs_keep_the_app_request_id() {
         let core = Arc::new(Core::new(
-            provider_registry(),
+            test_providers(),
             Arc::new(StubCapturer::default()),
         ));
         let mut outputs = core.start_provider_stream(
@@ -484,15 +511,48 @@ mod tests {
     }
 
     #[test]
-    fn aborting_stops_the_active_provider_request() {
-        let providers = ProviderRegistry::new();
+    fn missing_model_failure_keeps_the_app_request_id() {
+        let providers = Providers::new();
         let provider = Arc::new(RecordingProvider {
             requested_models: Mutex::new(Vec::new()),
             aborted: AtomicBool::new(false),
             retried: AtomicBool::new(false),
         });
         let provider_id = ProviderId::new("recording");
-        providers.add_provider(provider_id.clone(), provider.clone());
+        providers.insert(provider_id.clone(), provider.clone());
+        let core = Arc::new(Core::new(providers, Arc::new(StubCapturer::default())));
+        let _previous =
+            core.start_provider_stream(41, None, ModelSelection::new(provider_id, "first"));
+        let mut outputs = core.handle_input(Input::Submit {
+            request_id: 42,
+            prompt: None,
+            model: None,
+        });
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .expect("test runtime should start");
+
+        let output = runtime
+            .block_on(outputs.next())
+            .expect("missing model should produce an error");
+
+        assert!(matches!(
+            output,
+            Output::ProviderRequestFailed { request_id: 42, .. }
+        ));
+        assert!(provider.aborted.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn aborting_stops_the_active_provider_request() {
+        let providers = Providers::new();
+        let provider = Arc::new(RecordingProvider {
+            requested_models: Mutex::new(Vec::new()),
+            aborted: AtomicBool::new(false),
+            retried: AtomicBool::new(false),
+        });
+        let provider_id = ProviderId::new("recording");
+        providers.insert(provider_id.clone(), provider.clone());
         let core = Arc::new(Core::new(providers, Arc::new(StubCapturer::default())));
         let _outputs = core.start_provider_stream(
             1,
@@ -507,14 +567,14 @@ mod tests {
 
     #[test]
     fn retrying_uses_the_previous_provider_request() {
-        let providers = ProviderRegistry::new();
+        let providers = Providers::new();
         let provider = Arc::new(RecordingProvider {
             requested_models: Mutex::new(Vec::new()),
             aborted: AtomicBool::new(false),
             retried: AtomicBool::new(false),
         });
         let provider_id = ProviderId::new("recording");
-        providers.add_provider(provider_id.clone(), provider.clone());
+        providers.insert(provider_id.clone(), provider.clone());
         let core = Arc::new(Core::new(providers, Arc::new(StubCapturer::default())));
         let _outputs = core.start_provider_stream(
             1,

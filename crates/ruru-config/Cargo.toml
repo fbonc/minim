@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 directories = "6"
-ruru-provider = { path = "../ruru-provider" }
+ruru-types = { path = "../ruru-types" }
 serde = { version = "1", features = ["derive"] }
 tempfile = "3"
 thiserror = "2"

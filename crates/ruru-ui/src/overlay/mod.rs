@@ -1,5 +1,5 @@
 use iced::{Subscription, Task};
-use ruru_provider::ModelSelection;
+use ruru_types::ModelSelection;
 use ruru_types::Target;
 
 pub mod answering;
@@ -35,6 +35,7 @@ pub enum Output {
         prompt: Option<String>,
         model: Option<ModelSelection>,
     },
+    ModelSelected(ModelSelection),
     TargetRemoved,
     CaptureRegionRequested,
     ProviderRequestAbortRequested,
@@ -57,6 +58,7 @@ pub struct Overlay {
     pub visible: bool,
     pub target: Option<Target>,
     selected_model: Option<ModelSelection>,
+    available_models: Vec<ModelSelection>,
     prompting: prompting::Prompting,
     answering: answering::Answering,
     capture_ready: bool,
@@ -69,6 +71,7 @@ impl Default for Overlay {
             visible: false,
             target: None,
             selected_model: None,
+            available_models: Vec::new(),
             prompting: prompting::Prompting::new(),
             answering: answering::Answering::default(),
             capture_ready: true,
@@ -85,6 +88,26 @@ impl Overlay {
     pub fn with_selected_model(mut self, selected_model: Option<ModelSelection>) -> Self {
         self.selected_model = selected_model;
         self
+    }
+
+    pub fn with_models(mut self, models: Vec<ModelSelection>) -> Self {
+        self.reconcile_models(&models);
+        self
+    }
+
+    pub fn selected_model(&self) -> Option<&ModelSelection> {
+        self.selected_model.as_ref()
+    }
+
+    pub fn reconcile_models(&mut self, models: &[ModelSelection]) {
+        self.available_models = models.to_vec();
+        if self
+            .selected_model
+            .as_ref()
+            .is_none_or(|selected| !models.contains(selected))
+        {
+            self.selected_model = models.first().cloned();
+        }
     }
 
     pub fn check_prompt_input_focus(&self) -> Task<Input> {

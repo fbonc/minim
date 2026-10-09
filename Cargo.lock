@@ -4602,9 +4602,7 @@ dependencies = [
  "objc2 0.6.4",
  "objc2-app-kit 0.3.2",
  "objc2-foundation 0.3.2",
- "ruru-config",
  "ruru-core",
- "ruru-provider",
  "ruru-types",
  "ruru-ui",
 ]
@@ -4630,7 +4628,7 @@ name = "ruru-config"
 version = "0.1.0"
 dependencies = [
  "directories",
- "ruru-provider",
+ "ruru-types",
  "security-framework",
  "security-framework-sys",
  "serde",
@@ -4646,6 +4644,7 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "ruru-capture",
+ "ruru-config",
  "ruru-hotkey",
  "ruru-provider",
  "ruru-types",
@@ -4678,6 +4677,9 @@ dependencies = [
 [[package]]
 name = "ruru-types"
 version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "ruru-ui"
@@ -4689,7 +4691,6 @@ dependencies = [
  "ratex-parser",
  "ratex-svg",
  "ratex-types",
- "ruru-provider",
  "ruru-types",
 ]
 

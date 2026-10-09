@@ -8,7 +8,6 @@ edition = "2024"
 # live in the ruru-app host, not here.
 [dependencies]
 iced = { version = "0.14.0", features = ["tokio", "image", "markdown", "highlighter", "svg", "advanced"] }
-ruru-provider = { path = "../ruru-provider" }
 ruru-types = { path = "../ruru-types" }
 pulldown-cmark = "0.12.2"
 ratex-layout = "0.1.14"

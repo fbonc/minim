@@ -1,10 +1,10 @@
 use iced::border::Radius;
-use iced::widget::{button, container, markdown, overlay::menu, pick_list, scrollable, text_input};
+use iced::widget::{button, container, markdown, overlay::menu, pick_list, text_input};
 use iced::{Background, Border, Color, Font, Shadow, Theme};
 
 pub use crate::style::{
     ACCENT_COLOR, BORDER_COLOR, DANGER_COLOR, INPUT_BACKGROUND, INPUT_BORDER_COLOR, MUTED_COLOR,
-    SCROLLBAR_WIDTH, SCROLLER_COLOR, SELECTION_COLOR, TEXT_COLOR,
+    SCROLLBAR_WIDTH, SELECTION_COLOR, TEXT_COLOR, scroll,
 };
 
 pub const MODEL_PICKER_BACKGROUND: Color = Color::from_rgb8(0x21, 0x1E, 0x2C);
@@ -217,12 +217,4 @@ pub fn answer_markdown() -> markdown::Style {
     style.inline_code_color = TEXT_COLOR;
     style.link_color = Color::from_rgb8(0xA9, 0x9F, 0xFF);
     style
-}
-
-pub fn scroll(theme: &Theme, status: scrollable::Status) -> scrollable::Style {
-    let mut base = scrollable::default(theme, status);
-    base.vertical_rail.background = None;
-    base.vertical_rail.border = Border::default();
-    base.vertical_rail.scroller.background = SCROLLER_COLOR.into();
-    base
 }

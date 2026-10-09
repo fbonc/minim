@@ -1,4 +1,4 @@
-use ruru_provider::ProviderId;
+use ruru_types::ProviderId;
 
 use crate::{Error, Result};
 

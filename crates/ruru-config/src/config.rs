@@ -4,7 +4,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use directories::BaseDirs;
-use ruru_provider::{ModelSelection, ProviderId};
+use ruru_types::{ModelSelection, ProviderId};
 use serde::{Deserialize, Serialize};
 use tempfile::NamedTempFile;
 
@@ -118,7 +118,6 @@ impl AppConfig {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ProviderSettings {
-    pub enabled: bool,
     pub models: Vec<String>,
 }
 
@@ -132,7 +131,6 @@ mod tests {
             providers: BTreeMap::from([(
                 ProviderId::new("openai"),
                 ProviderSettings {
-                    enabled: true,
                     models: vec!["gpt-test".into()],
                 },
             )]),
@@ -272,6 +270,30 @@ enabled = true
         assert_eq!(
             config.providers[&ProviderId::new("openai")].models,
             Vec::<String>::new()
+        );
+    }
+
+    #[test]
+    fn legacy_enabled_flag_is_discarded() {
+        let config: AppConfig = toml::from_str(
+            r#"
+version = 1
+
+[providers.openai]
+enabled = false
+models = ["gpt-test"]
+"#,
+        )
+        .expect("load existing configuration");
+
+        assert_eq!(
+            config.providers[&ProviderId::new("openai")].models,
+            ["gpt-test"]
+        );
+        assert!(
+            !toml::to_string(&config)
+                .expect("serialize config")
+                .contains("enabled")
         );
     }
 

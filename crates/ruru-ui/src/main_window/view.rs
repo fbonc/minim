@@ -11,12 +11,26 @@ static LOGO: LazyLock<image::Handle> = LazyLock::new(|| {
 
 impl MainWindow {
     pub fn view(&self) -> Element<'_, Input> {
-        container(column![header(self), space()].width(Fill).height(Fill))
-            .padding(style::WINDOW_PADDING)
-            .width(Fill)
-            .height(Fill)
-            .style(style::window)
-            .into()
+        let content: Element<'_, Input> = match self.mode {
+            WindowMode::Home => space().into(),
+            WindowMode::Settings => self.settings.view().map(Input::Settings),
+        };
+
+        container(
+            column![header(self), content]
+                .spacing(if self.mode == WindowMode::Settings {
+                    0.0
+                } else {
+                    style::CONTENT_SPACING
+                })
+                .width(Fill)
+                .height(Fill),
+        )
+        .padding(style::WINDOW_PADDING)
+        .width(Fill)
+        .height(Fill)
+        .style(style::window)
+        .into()
     }
 }
 

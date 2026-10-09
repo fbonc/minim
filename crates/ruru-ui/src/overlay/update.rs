@@ -19,8 +19,8 @@ impl Overlay {
                 Some(Output::CaptureRegionRequested)
             }
             Input::Prompting(prompting::Input::ModelSelected(selection)) => {
-                self.selected_model = Some(selection);
-                None
+                self.selected_model = Some(selection.clone());
+                Some(Output::ModelSelected(selection))
             }
             Input::Prompting(input) => {
                 self.prompting.update(input);
@@ -111,7 +111,7 @@ impl Overlay {
 
 #[cfg(test)]
 mod tests {
-    use ruru_provider::{ModelSelection, ProviderId};
+    use ruru_types::{ModelSelection, ProviderId};
     use ruru_types::{Target, TextCapture, TextCaptureMethod};
 
     use super::*;
@@ -241,12 +241,11 @@ mod tests {
         let mut overlay = Overlay::new();
         let selection = ModelSelection::new(ProviderId::new("openai"), "gpt-test");
 
-        assert!(
-            overlay
-                .update(Input::Prompting(prompting::Input::ModelSelected(
-                    selection.clone()
-                )))
-                .is_none()
+        assert_eq!(
+            overlay.update(Input::Prompting(prompting::Input::ModelSelected(
+                selection.clone()
+            ))),
+            Some(Output::ModelSelected(selection.clone()))
         );
         assert_eq!(
             overlay.update(Input::Prompting(prompting::Input::SubmitRequested)),
@@ -419,6 +418,23 @@ mod tests {
         assert!(!overlay.visible);
         assert!(overlay.answering.answer().is_empty());
         assert!(overlay.answering.error().is_none());
+    }
+
+    #[test]
+    fn removed_model_selection_falls_back_to_a_remaining_model() {
+        let provider = ProviderId::new("openai");
+        let first = ModelSelection::new(provider.clone(), "first");
+        let second = ModelSelection::new(provider, "second");
+        let mut overlay = Overlay::new().with_selected_model(Some(second.clone()));
+
+        overlay.reconcile_models(&[first.clone(), second.clone()]);
+        assert_eq!(overlay.selected_model(), Some(&second));
+
+        overlay.reconcile_models(std::slice::from_ref(&first));
+        assert_eq!(overlay.selected_model(), Some(&first));
+
+        overlay.reconcile_models(&[]);
+        assert_eq!(overlay.selected_model(), None);
     }
 
     #[test]

@@ -4,7 +4,6 @@ use iced::advanced::text::Wrapping;
 use iced::widget::{button, column, container, image, row, space, svg, text};
 use iced::{Center, Element, Fill};
 
-use ruru_provider::ModelSelection;
 use ruru_types::Target;
 
 use super::style;
@@ -15,15 +14,19 @@ static LOGO: LazyLock<image::Handle> = LazyLock::new(|| {
 });
 
 impl Overlay {
-    pub fn view(&self, available_models: Vec<ModelSelection>) -> Element<'_, Input> {
+    pub fn view(&self) -> Element<'_, Input> {
         let selected_model = self
             .selected_model
             .clone()
-            .filter(|selected| available_models.contains(selected));
+            .filter(|selected| self.available_models.contains(selected));
         let content = match self.mode {
             OverlayMode::Prompting => self
                 .prompting
-                .view(available_models, selected_model, self.capture_ready)
+                .view(
+                    self.available_models.clone(),
+                    selected_model,
+                    self.capture_ready,
+                )
                 .map(Input::Prompting),
             OverlayMode::Answering => self.answering.view().map(Input::Answering),
         };

@@ -1,6 +1,6 @@
 use iced::{Task, window as iced_window};
-use ruru_core::Output as CoreOutput;
-use ruru_types::Target;
+use ruru_core::{Input as CoreInput, Output as CoreOutput, SettingsChange};
+use ruru_types::{ProviderId, Target};
 use ruru_ui::main_window;
 use ruru_ui::overlay;
 use ruru_ui::{OverlayMode, OverlayOutput};
@@ -39,9 +39,7 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
         }
         Input::DragWindow => iced_window::drag(state.overlay.id),
         Input::MainWindow(input) => match state.main_window.ui.update(input) {
-            Some(main_window::Output::Dismissed) => {
-                iced_window::set_mode(state.main_window.id, iced_window::Mode::Hidden)
-            }
+            Some(output) => handle_main_window_output(state, output),
             None => Task::none(),
         },
         Input::Core(output) => match output {
@@ -102,19 +100,50 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
                 let _ = state.overlay.ui.update(overlay::Input::FailAnswer(error));
                 Task::none()
             }
+            CoreOutput::SettingsUpdated(update) => {
+                advance_provider_request_id(state);
+                let _ = state
+                    .overlay
+                    .ui
+                    .update(overlay::Input::ProviderRequestAbortRequested);
+                match update.change {
+                    SettingsChange::KeySaved => state.main_window.ui.key_saved(&update.provider),
+                    SettingsChange::KeyRemoved => {
+                        state.main_window.ui.key_removed(&update.provider)
+                    }
+                    SettingsChange::ModelsChanged => {}
+                }
+                state
+                    .main_window
+                    .ui
+                    .set_models(&update.provider, update.models);
+                state.main_window.ui.clear_settings_error();
+                state.overlay.ui.reconcile_models(&update.available_models);
+                Task::none()
+            }
+            CoreOutput::ModelsDiscovered { provider, result } => {
+                match result {
+                    Ok(models) => state
+                        .main_window
+                        .ui
+                        .finish_model_discovery(&provider, models),
+                    Err(error) => state.main_window.ui.provider_error(&provider, error),
+                }
+                Task::none()
+            }
+            CoreOutput::SettingsFailed { provider, error } => {
+                if let Some(provider) = provider {
+                    state.main_window.ui.provider_error(&provider, error);
+                } else {
+                    state.main_window.ui.settings_error(error);
+                }
+                Task::none()
+            }
         },
         Input::Overlay(input) => match state.overlay.ui.update(input) {
             Some(OverlayOutput::Submitted { prompt, model }) => {
-                let configured_models = state.providers.configured_models();
-                let Some(model) = model.filter(|selected| configured_models.contains(selected))
-                else {
-                    let _ = state.overlay.ui.update(overlay::Input::FailAnswer(
-                        "no available model selected".into(),
-                    ));
-                    return Task::none();
-                };
                 let request_id = advance_provider_request_id(state);
-                if let Err(error) = state.to_core.try_send(ruru_core::Input::Submit {
+                if let Err(error) = state.to_core.unbounded_send(CoreInput::Submit {
                     request_id,
                     prompt,
                     model,
@@ -130,8 +159,14 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
                     iced::Size::new(WINDOW_WIDTH, ANSWERING_HEIGHT),
                 )
             }
+            Some(OverlayOutput::ModelSelected(model)) => {
+                if let Err(error) = state.to_core.unbounded_send(CoreInput::SelectModel(model)) {
+                    eprintln!("failed to select model: {error}");
+                }
+                Task::none()
+            }
             Some(OverlayOutput::TargetRemoved) => {
-                if let Err(error) = state.to_core.try_send(ruru_core::Input::RemoveTarget) {
+                if let Err(error) = state.to_core.unbounded_send(CoreInput::RemoveTarget) {
                     eprintln!("failed to remove target from core: {error}");
                 }
                 Task::none()
@@ -152,7 +187,7 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
                 let request_id = advance_provider_request_id(state);
                 if let Err(error) = state
                     .to_core
-                    .try_send(ruru_core::Input::RetryProviderRequest { request_id })
+                    .unbounded_send(CoreInput::RetryProviderRequest { request_id })
                 {
                     advance_provider_request_id(state);
                     eprintln!("failed to retry provider request: {error}");
@@ -201,7 +236,7 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
             }
         }
         Input::BeginRegionSelection => {
-            if let Err(error) = state.to_core.try_send(ruru_core::Input::SelectRegion) {
+            if let Err(error) = state.to_core.unbounded_send(CoreInput::SelectRegion) {
                 state.selecting_region = false;
                 eprintln!("region selection failed to start: {error}");
                 let _ = state.overlay.ui.update(overlay::Input::CaptureFailed);
@@ -218,7 +253,7 @@ fn abort_provider_request(state: &mut App) {
     advance_provider_request_id(state);
     if let Err(error) = state
         .to_core
-        .try_send(ruru_core::Input::AbortProviderRequest)
+        .unbounded_send(CoreInput::AbortProviderRequest)
     {
         eprintln!("failed to abort provider request: {error}");
     }
@@ -227,4 +262,49 @@ fn abort_provider_request(state: &mut App) {
 fn advance_provider_request_id(state: &mut App) -> ruru_core::ProviderRequestId {
     state.current_provider_request_id = state.current_provider_request_id.wrapping_add(1);
     state.current_provider_request_id
+}
+
+fn handle_main_window_output(state: &mut App, output: main_window::Output) -> Task<Input> {
+    match output {
+        main_window::Output::Dismissed => {
+            iced_window::set_mode(state.main_window.id, iced_window::Mode::Hidden)
+        }
+        main_window::Output::JumpToSection(section) => {
+            state.main_window.ui.jump_to_section(section)
+        }
+        main_window::Output::DiscoverModels(id) => {
+            state.main_window.ui.start_model_discovery(&id);
+            send_settings_command(state, &id, CoreInput::DiscoverModels(id.clone()))
+        }
+        main_window::Output::SaveKey(id, key) => {
+            state.main_window.ui.start_model_discovery(&id);
+            send_settings_command(state, &id, CoreInput::SaveKey(id.clone(), key))
+        }
+        main_window::Output::RemoveKey(id) => {
+            send_settings_command(state, &id, CoreInput::RemoveKey(id.clone()))
+        }
+        main_window::Output::SetModel {
+            provider,
+            model,
+            enabled,
+        } => send_settings_command(
+            state,
+            &provider,
+            CoreInput::SetModel {
+                provider: provider.clone(),
+                model,
+                enabled,
+            },
+        ),
+    }
+}
+
+fn send_settings_command(state: &mut App, provider: &ProviderId, input: CoreInput) -> Task<Input> {
+    if let Err(error) = state.to_core.unbounded_send(input) {
+        state
+            .main_window
+            .ui
+            .provider_error(provider, error.to_string());
+    }
+    Task::none()
 }

@@ -1,11 +1,9 @@
 use iced::{Task, Theme, window as iced_window};
 use ruru_core::{Output as CoreOutput, Sender as CoreSender};
-use ruru_provider::ProviderRegistry;
 use ruru_ui::Overlay as OverlayUi;
 use ruru_ui::main_window::{self, MainWindow as MainWindowUi};
 use ruru_ui::overlay;
 
-mod providers;
 #[cfg(target_os = "macos")]
 mod reopen;
 mod update;
@@ -21,7 +19,6 @@ const ANSWERING_HEIGHT: f32 = 360.0;
 struct App {
     main_window: WindowHost<MainWindowUi>,
     overlay: WindowHost<OverlayUi>,
-    providers: ProviderRegistry,
     to_core: CoreSender,
     current_provider_request_id: ruru_core::ProviderRequestId,
     selecting_region: bool,
@@ -59,8 +56,26 @@ pub(super) fn run() -> iced::Result {
 }
 
 fn boot() -> (App, Task<Input>) {
-    let (providers, selected_model) = providers::load_providers();
-    let (to_core, core_outputs) = ruru_core::start(providers.clone());
+    let (to_core, core_outputs, settings) = ruru_core::start();
+    let provider_views = settings
+        .providers
+        .iter()
+        .map(|provider| {
+            main_window::ProviderView::new(
+                provider.id.clone(),
+                provider.name,
+                provider.has_key,
+                provider.models.clone(),
+            )
+        })
+        .collect();
+    let mut main_ui = MainWindowUi::new().with_providers(provider_views);
+    if let Some(error) = settings.load_error {
+        main_ui.settings_error(format!("Cannot edit settings: {error}"));
+    }
+    let overlay_ui = OverlayUi::new()
+        .with_selected_model(settings.selected_model)
+        .with_models(settings.available_models);
     let (main, open_main) = iced_window::open(windows::main_settings());
     let (overlay, open_overlay) = iced_window::open(windows::overlay_settings());
 
@@ -74,13 +89,12 @@ fn boot() -> (App, Task<Input>) {
         App {
             main_window: WindowHost {
                 id: main,
-                ui: MainWindowUi::new(),
+                ui: main_ui,
             },
             overlay: WindowHost {
                 id: overlay,
-                ui: OverlayUi::new().with_selected_model(selected_model),
+                ui: overlay_ui,
             },
-            providers,
             to_core,
             current_provider_request_id: 0,
             selecting_region: false,

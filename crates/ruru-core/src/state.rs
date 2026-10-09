@@ -20,7 +20,7 @@ pub(crate) struct State {
     current_capture: Option<Capture>,
     provider_request_id: u64,
     provider_abort: Option<AbortHandle>,
-    request_provider: Option<Arc<dyn Provider>>,
+    provider: Option<Arc<dyn Provider>>,
 }
 
 impl State {
@@ -30,8 +30,7 @@ impl State {
     }
 
     pub(crate) fn start_capture(&mut self) -> u64 {
-        self.abort_provider_request();
-        self.request_provider = None;
+        self.forget_provider_request();
         self.capture_id = self.capture_id.wrapping_add(1);
         self.current_capture = None;
         self.capture_id
@@ -81,7 +80,7 @@ impl State {
         };
         let (abort, registration) = AbortHandle::new_pair();
         self.provider_abort = Some(abort);
-        self.request_provider = provider;
+        self.provider = provider;
         (request, self.provider_request_id, registration)
     }
 
@@ -92,7 +91,7 @@ impl State {
         let (abort, registration) = AbortHandle::new_pair();
         self.provider_abort = Some(abort);
         (
-            self.request_provider.clone(),
+            self.provider.clone(),
             self.provider_request_id,
             registration,
         )
@@ -106,9 +105,14 @@ impl State {
         } else {
             false
         };
-        if request_was_active && let Some(provider) = &self.request_provider {
+        if request_was_active && let Some(provider) = &self.provider {
             provider.abort_request();
         }
+    }
+
+    pub(crate) fn forget_provider_request(&mut self) {
+        self.abort_provider_request();
+        self.provider = None;
     }
 
     pub(crate) fn accept_provider_output(&mut self, request_id: u64, output: &Output) -> bool {
@@ -130,7 +134,9 @@ impl State {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ruru_provider::MockProvider;
     use ruru_types::{Provenance, TextCapture, TextCaptureMethod};
+    use std::time::Duration;
 
     fn image() -> ImageCapture {
         ImageCapture {
@@ -326,6 +332,17 @@ mod tests {
                 chunk: "stale".into(),
             }
         ));
+    }
+
+    #[test]
+    fn forgetting_a_provider_request_prevents_retry() {
+        let mut state = State::default();
+        state.start_provider_request(None, Some(Arc::new(MockProvider::new(Duration::ZERO))));
+
+        state.forget_provider_request();
+
+        let (provider, _, _) = state.start_provider_retry();
+        assert!(provider.is_none());
     }
 
     #[test]

@@ -9,6 +9,7 @@ impl MainWindow {
             }
             Input::DismissRequested => {
                 self.visible = false;
+                self.settings.discard_draft();
                 Some(Output::Dismissed)
             }
             Input::SettingsRequested => {
@@ -17,8 +18,26 @@ impl MainWindow {
             }
             Input::BackRequested => {
                 self.mode = WindowMode::Home;
+                self.settings.discard_draft();
                 None
             }
+            Input::Settings(input) => self.settings.update(input),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn settings_and_back_switch_modes() {
+        let mut window = MainWindow::new();
+
+        assert!(window.update(Input::SettingsRequested).is_none());
+        assert_eq!(window.mode, WindowMode::Settings);
+
+        assert!(window.update(Input::BackRequested).is_none());
+        assert_eq!(window.mode, WindowMode::Home);
     }
 }
