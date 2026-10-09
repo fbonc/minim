@@ -50,7 +50,7 @@ pub(super) fn run() -> iced::Result {
         .title("ruru")
         .style(|_state: &App, _theme: &iced::Theme| iced::theme::Style {
             background_color: iced::Color::TRANSPARENT,
-            text_color: iced::Color::BLACK,
+            text_color: iced::Color::from_rgb8(0xED, 0xEB, 0xE6),
         })
         .run()
 }

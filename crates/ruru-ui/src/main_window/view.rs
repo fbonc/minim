@@ -48,7 +48,7 @@ fn header(window: &MainWindow) -> Element<'_, Input> {
         ]
         .align_y(Center)
         .width(Fill),
-        rule::horizontal(1)
+        rule::horizontal(1).style(style::sidebar_rule)
     ]
     .spacing(15)
     .into()

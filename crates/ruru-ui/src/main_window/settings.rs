@@ -197,7 +197,9 @@ impl ProviderView {
             content = content.push(text(error).color(style::DANGER_COLOR));
         }
         if self.credential_present {
-            content = content.push(rule::horizontal(1)).push(models);
+            content = content
+                .push(rule::horizontal(1).style(style::sidebar_rule))
+                .push(models);
         }
         content.into()
     }

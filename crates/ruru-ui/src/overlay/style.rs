@@ -7,8 +7,8 @@ pub use crate::style::{
     SCROLLBAR_WIDTH, SELECTION_COLOR, TEXT_COLOR, scroll,
 };
 
-pub const MODEL_PICKER_BACKGROUND: Color = Color::from_rgb8(0x21, 0x1E, 0x2C);
-pub const MODEL_MENU_HIGHLIGHT: Color = Color::from_rgb8(0x2C, 0x27, 0x50);
+pub const MODEL_PICKER_BACKGROUND: Color = Color::from_rgb8(0x1E, 0x1E, 0x1C);
+pub const MODEL_MENU_HIGHLIGHT: Color = Color::from_rgb8(0x3D, 0x18, 0x20);
 pub const BORDER_STYLE: Border = Border {
     color: BORDER_COLOR,
     width: 1.0,
@@ -71,11 +71,11 @@ const ANSWER_FONT: Font = Font::DEFAULT;
 pub const HINT_TEXT: &str = "Or just press Enter — I’ll figure it out";
 pub const HINT_SIZE: f32 = 12.5;
 pub const HINT_SPACING: f32 = 8.0;
-pub const HINT_COLOR: Color = Color::from_rgb8(0x8C, 0x87, 0xA3);
+pub const HINT_COLOR: Color = Color::from_rgb8(0x8E, 0x8B, 0x83);
 
 pub fn input_box(_theme: &Theme, focused: bool) -> container::Style {
     let border_color = if focused {
-        Color::from_rgba8(0xA9, 0x9F, 0xFF, 0.45)
+        Color::from_rgba8(0xFF, 0x8A, 0x9E, 0.45)
     } else {
         INPUT_BORDER_COLOR
     };
@@ -102,7 +102,7 @@ pub fn input(_theme: &Theme, _status: text_input::Status) -> text_input::Style {
             radius: 0.0.into(),
         },
         icon: MUTED_COLOR,
-        placeholder: MUTED_COLOR,
+        placeholder: HINT_COLOR,
         value: TEXT_COLOR,
         selection: SELECTION_COLOR,
     }
@@ -119,7 +119,7 @@ pub fn send_button(_theme: &Theme, status: button::Status) -> button::Style {
         background,
         text_color: match status {
             button::Status::Disabled => MUTED_COLOR,
-            _ => Color::from_rgb8(0xC9, 0xC2, 0xFF),
+            _ => ACCENT_COLOR,
         },
         border: Border {
             radius: INPUT_RADIUS.into(),
@@ -169,13 +169,13 @@ pub fn model_picker(_theme: &Theme, status: pick_list::Status) -> pick_list::Sty
     let border_color = match status {
         pick_list::Status::Active => INPUT_BORDER_COLOR,
         pick_list::Status::Hovered | pick_list::Status::Opened { .. } => {
-            Color::from_rgb8(0x6C, 0x5C, 0xFF)
+            Color::from_rgb8(0xC8, 0x20, 0x3F)
         }
     };
 
     pick_list::Style {
         text_color: TEXT_COLOR,
-        placeholder_color: MUTED_COLOR,
+        placeholder_color: HINT_COLOR,
         handle_color: MUTED_COLOR,
         background: MODEL_PICKER_BACKGROUND.into(),
         border: Border {
@@ -215,6 +215,6 @@ pub fn answer_markdown() -> markdown::Style {
     style.font = ANSWER_FONT;
     style.inline_code_highlight.background = INPUT_BACKGROUND.into();
     style.inline_code_color = TEXT_COLOR;
-    style.link_color = Color::from_rgb8(0xA9, 0x9F, 0xFF);
+    style.link_color = ACCENT_COLOR;
     style
 }

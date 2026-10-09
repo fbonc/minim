@@ -1,9 +1,9 @@
 use iced::widget::{button, checkbox, container, overlay::menu, pick_list, rule, text_input};
-use iced::{Background, Border, Shadow, Theme};
+use iced::{Background, Border, Color, Shadow, Theme};
 
 use crate::style::{
-    BACKGROUND_COLOR, BORDER_COLOR, INPUT_BACKGROUND, INPUT_BORDER_COLOR, SELECTION_COLOR,
-    TEXT_COLOR,
+    BACKGROUND_COLOR, BORDER_COLOR, INPUT_BACKGROUND, INPUT_BORDER_COLOR, SCROLLER_COLOR,
+    SELECTION_COLOR, TEXT_COLOR,
 };
 pub(super) use crate::style::{DANGER_COLOR, MUTED_COLOR};
 
@@ -15,7 +15,7 @@ pub(super) const HEADER_ACTION_ICON_SIZE: f32 = 22.0;
 pub(super) const SETTINGS_ICON_SIZE: f32 = 25.0;
 pub(super) const SIDEBAR_WIDTH: f32 = 160.0;
 pub(super) const SETTINGS_COLUMN_SPACING: f32 = 24.0;
-pub(super) const SCROLL_CONTENT_GAP: f32 = 18.0;
+pub(super) const SCROLL_CONTENT_GAP: f32 = 50.0;
 pub(super) const SECTION_PADDING: f32 = 18.0;
 pub(super) const SECTION_SPACING: f32 = 16.0;
 pub(super) const MODEL_LIST_HEIGHT: f32 = 280.0;
@@ -34,7 +34,7 @@ pub(super) fn window(_theme: &Theme) -> container::Style {
 
 pub(super) fn sidebar_rule(theme: &Theme) -> rule::Style {
     let mut style = rule::default(theme);
-    style.color.a = 0.65;
+    style.color = BORDER_COLOR;
     style
 }
 
@@ -61,7 +61,7 @@ pub(super) fn header_button(_theme: &Theme, status: button::Status) -> button::S
 
 pub(super) fn provider_card(_theme: &Theme) -> container::Style {
     container::Style {
-        background: Some(INPUT_BACKGROUND.into()),
+        background: Some(Color::from_rgb8(0x1E, 0x1E, 0x1C).into()),
         border: Border {
             color: BORDER_COLOR,
             width: 1.0,
@@ -85,9 +85,9 @@ pub(super) fn selected_section(_theme: &Theme, _status: button::Status) -> butto
 
 pub(super) fn action_button(_theme: &Theme, status: button::Status) -> button::Style {
     let background = match status {
-        button::Status::Hovered => INPUT_BORDER_COLOR,
-        button::Status::Pressed => SELECTION_COLOR,
-        button::Status::Active | button::Status::Disabled => BORDER_COLOR,
+        button::Status::Hovered | button::Status::Pressed => Color::from_rgb8(0xB0, 0x1C, 0x38),
+        button::Status::Active => Color::from_rgb8(0xC8, 0x20, 0x3F),
+        button::Status::Disabled => BORDER_COLOR,
     };
 
     button::Style {
@@ -95,7 +95,7 @@ pub(super) fn action_button(_theme: &Theme, status: button::Status) -> button::S
         text_color: if status == button::Status::Disabled {
             MUTED_COLOR
         } else {
-            TEXT_COLOR
+            Color::WHITE
         },
         border: Border {
             radius: 8.0.into(),
@@ -108,7 +108,7 @@ pub(super) fn action_button(_theme: &Theme, status: button::Status) -> button::S
 pub(super) fn add_provider_picker(_theme: &Theme, status: pick_list::Status) -> pick_list::Style {
     pick_list::Style {
         text_color: TEXT_COLOR,
-        placeholder_color: TEXT_COLOR,
+        placeholder_color: MUTED_COLOR,
         handle_color: MUTED_COLOR,
         background: match status {
             pick_list::Status::Hovered | pick_list::Status::Opened { .. } => {
@@ -159,10 +159,10 @@ pub(super) fn subtle_button(_theme: &Theme, status: button::Status) -> button::S
 
 pub(super) fn key_input(_theme: &Theme, status: text_input::Status) -> text_input::Style {
     text_input::Style {
-        background: Background::Color(BACKGROUND_COLOR),
+        background: Background::Color(INPUT_BACKGROUND),
         border: Border {
             color: if matches!(status, text_input::Status::Focused { .. }) {
-                INPUT_BORDER_COLOR
+                Color::from_rgba8(0xFF, 0x8A, 0x9E, 0.45)
             } else {
                 BORDER_COLOR
             },
@@ -170,7 +170,7 @@ pub(super) fn key_input(_theme: &Theme, status: text_input::Status) -> text_inpu
             radius: 8.0.into(),
         },
         icon: MUTED_COLOR,
-        placeholder: MUTED_COLOR,
+        placeholder: SCROLLER_COLOR,
         value: TEXT_COLOR,
         selection: SELECTION_COLOR,
     }
@@ -185,14 +185,14 @@ pub(super) fn provider_checkbox(_theme: &Theme, status: checkbox::Status) -> che
 
     checkbox::Style {
         background: if checked {
-            SELECTION_COLOR.into()
+            Color::from_rgb8(0xC8, 0x20, 0x3F).into()
         } else {
-            BACKGROUND_COLOR.into()
+            INPUT_BACKGROUND.into()
         },
-        icon_color: TEXT_COLOR,
+        icon_color: Color::WHITE,
         border: Border {
-            color: if hovered {
-                INPUT_BORDER_COLOR
+            color: if checked || hovered {
+                Color::from_rgb8(0xC8, 0x20, 0x3F)
             } else {
                 BORDER_COLOR
             },
