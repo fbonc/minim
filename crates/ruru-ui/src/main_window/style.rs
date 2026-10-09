@@ -15,9 +15,10 @@ pub(super) const HEADER_ACTION_ICON_SIZE: f32 = 22.0;
 pub(super) const SETTINGS_ICON_SIZE: f32 = 25.0;
 pub(super) const SIDEBAR_WIDTH: f32 = 160.0;
 pub(super) const SETTINGS_COLUMN_SPACING: f32 = 24.0;
-pub(super) const SCROLL_CONTENT_GAP: f32 = 50.0;
+pub(super) const SCROLL_CONTENT_GAP: f32 = 38.0;
 pub(super) const SECTION_PADDING: f32 = 18.0;
 pub(super) const SECTION_SPACING: f32 = 16.0;
+pub(super) const MODEL_LIST_WIDTH: f32 = 360.0;
 pub(super) const MODEL_LIST_HEIGHT: f32 = 280.0;
 pub(super) const SECTION_TEXT_SIZE: f32 = 13.5;
 pub(super) const PAGE_HEADING_SIZE: f32 = 24.0;
@@ -66,6 +67,18 @@ pub(super) fn provider_card(_theme: &Theme) -> container::Style {
             color: BORDER_COLOR,
             width: 1.0,
             radius: 12.0.into(),
+        },
+        ..Default::default()
+    }
+}
+
+pub(super) fn model_list(_theme: &Theme) -> container::Style {
+    container::Style {
+        background: Some(INPUT_BACKGROUND.into()),
+        border: Border {
+            color: BORDER_COLOR,
+            width: 1.0,
+            radius: 8.0.into(),
         },
         ..Default::default()
     }

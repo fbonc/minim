@@ -183,11 +183,20 @@ impl ProviderView {
                     ..Default::default()
                 }))
                 .height(style::MODEL_LIST_HEIGHT)
+                .width(Fill)
                 .style(crate::style::scroll)
                 .into()
             } else {
                 model_choices.into()
             };
+        let model_list = container(model_list)
+            .padding(12)
+            .width(Fill)
+            .max_width(style::MODEL_LIST_WIDTH)
+            .style(style::model_list);
+        let model_header = container(model_header)
+            .width(Fill)
+            .max_width(style::MODEL_LIST_WIDTH);
         let models = column![model_header, model_list].spacing(10);
 
         let mut content = column![key_controls]
@@ -375,15 +384,22 @@ impl Settings {
                 })
                 .width(style::SIDEBAR_WIDTH),
             rule::vertical(1).style(style::sidebar_rule),
-            scrollable(container(content).padding(iced::Padding {
+            container(
+                scrollable(container(content).padding(iced::Padding {
+                    right: style::SCROLL_CONTENT_GAP,
+                    ..Default::default()
+                }))
+                .id(self.scroll_id.clone())
+                .width(Fill)
+                .height(Fill)
+                .style(crate::style::scroll),
+            )
+            .padding(iced::Padding {
                 top: style::CONTENT_SPACING,
-                right: style::SCROLL_CONTENT_GAP,
                 ..Default::default()
-            }))
-            .id(self.scroll_id.clone())
+            })
             .width(Fill)
-            .height(Fill)
-            .style(crate::style::scroll),
+            .height(Fill),
         ]
         .spacing(style::SETTINGS_COLUMN_SPACING)
         .height(Fill)
