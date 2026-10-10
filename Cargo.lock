@@ -4597,12 +4597,11 @@ checksum = "6c20b6793b5c2fa6553b250154b78d6d0db37e72700ae35fad9387a46f487c97"
 name = "ruru-app"
 version = "0.1.0"
 dependencies = [
- "futures-channel",
  "iced",
  "objc2 0.6.4",
  "objc2-app-kit 0.3.2",
- "objc2-foundation 0.3.2",
  "ruru-core",
+ "ruru-platform",
  "ruru-types",
  "ruru-ui",
 ]
@@ -4645,17 +4644,20 @@ dependencies = [
  "futures-util",
  "ruru-capture",
  "ruru-config",
- "ruru-hotkey",
+ "ruru-platform",
  "ruru-provider",
  "ruru-types",
  "tokio",
 ]
 
 [[package]]
-name = "ruru-hotkey"
+name = "ruru-platform"
 version = "0.1.0"
 dependencies = [
+ "futures-channel",
  "global-hotkey",
+ "objc2 0.6.4",
+ "objc2-foundation 0.3.2",
 ]
 
 [[package]]

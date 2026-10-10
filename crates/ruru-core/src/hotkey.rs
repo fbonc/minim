@@ -12,7 +12,7 @@ const HOTKEY_ACCELERATOR: &str = "Cmd+Shift+KeyE";
 pub(crate) fn outputs(core: Arc<Core>) -> impl Stream<Item = Output> {
     let (outputs, receiver) = mpsc::unbounded();
 
-    match ruru_hotkey::new_hotkey(HOTKEY_ACCELERATOR) {
+    match ruru_platform::new_hotkey(HOTKEY_ACCELERATOR) {
         Ok(hotkey) => {
             thread::spawn(move || {
                 loop {

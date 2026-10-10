@@ -14,7 +14,9 @@ pub(super) fn update(state: &mut App, input: Input) -> Task<Input> {
         #[cfg(target_os = "macos")]
         Input::WindowOpened(id) if id == state.main_window.id => {
             // AppKit installs its Apple event handlers during launch.
-            Task::run(super::reopen::install(), |_| Input::ShowMainWindow)
+            Task::run(ruru_platform::install_reopen_handler(), |_| {
+                Input::ShowMainWindow
+            })
         }
         Input::WindowOpened(_) => Task::none(),
         Input::WindowCloseRequested(id) if id == state.main_window.id => update(

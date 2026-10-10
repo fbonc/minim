@@ -29,4 +29,4 @@ For example, highlighting an unfamiliar term in a PDF should give the model the 
 
 ## Architecture
 
-This is a Rust workspace with an Iced desktop UI. `ruru-hotkey` starts a lookup; `ruru-core` coordinates capture and the answer request; `ruru-capture` owns the macOS Accessibility, clipboard, screenshot, and provenance code; and `ruru-provider` defines the streaming model interface. `ruru-app` hosts `ruru-ui`, while `ruru-types` holds the data shared between crates.
+This is a Rust workspace with an Iced desktop UI. `ruru-platform` provides the global hotkey and macOS Dock reopen event; `ruru-core` coordinates capture and the answer request; `ruru-capture` owns the macOS Accessibility, clipboard, screenshot, and provenance code; and `ruru-provider` defines the streaming model interface. `ruru-app` hosts `ruru-ui`, while `ruru-types` holds the data shared between crates.

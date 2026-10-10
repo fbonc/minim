@@ -13,7 +13,7 @@ use crate::types::RequestAbortController;
 use crate::{Provider, ProviderError, ProviderOutput, ProviderRequest, ProviderStream};
 
 const DEFAULT_BASE_URL: &str = "https://api.openai.com";
-use super::instructions::INSTRUCTIONS;
+use crate::ANSWER_INSTRUCTION;
 
 pub struct OpenAiConfig {
     pub api_key: String,
@@ -276,7 +276,7 @@ impl ResponsesRequest {
 
         Self {
             model: model.into(),
-            instructions: INSTRUCTIONS,
+            instructions: ANSWER_INSTRUCTION,
             input: vec![InputMessage {
                 role: "user",
                 content,

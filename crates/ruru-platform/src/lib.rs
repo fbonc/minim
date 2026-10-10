@@ -1,5 +1,10 @@
 #[cfg(target_os = "macos")]
-mod macos;
+mod hotkey;
+#[cfg(target_os = "macos")]
+mod reopen;
+
+#[cfg(target_os = "macos")]
+pub use reopen::install as install_reopen_handler;
 
 #[derive(Debug)]
 pub enum Error {
@@ -13,5 +18,5 @@ pub trait Hotkey: Send + Sync {
 
 #[cfg(target_os = "macos")]
 pub fn new_hotkey(accelerator: &str) -> Result<Box<dyn Hotkey>, Error> {
-    Ok(Box::new(macos::MacosHotkey::new(accelerator)?))
+    Ok(Box::new(hotkey::MacosHotkey::new(accelerator)?))
 }

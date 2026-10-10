@@ -6,7 +6,7 @@ edition = "2024"
 [dependencies]
 futures-channel = "0.3.31"
 futures-util = "0.3.31"
-ruru-hotkey = { path = "../ruru-hotkey" }
+ruru-platform = { path = "../ruru-platform" }
 ruru-config = { path = "../ruru-config" }
 ruru-provider = { path = "../ruru-provider" }
 ruru-types = { path = "../ruru-types" }

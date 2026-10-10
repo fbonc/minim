@@ -4,8 +4,6 @@ use ruru_ui::Overlay as OverlayUi;
 use ruru_ui::main_window::{self, MainWindow as MainWindowUi};
 use ruru_ui::overlay;
 
-#[cfg(target_os = "macos")]
-mod reopen;
 mod update;
 mod view;
 mod windows;

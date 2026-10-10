@@ -38,8 +38,8 @@ impl ReopenHandler {
     }
 }
 
-pub(super) fn install() -> mpsc::UnboundedReceiver<()> {
-    let mtm = MainThreadMarker::new().expect("application boot must run on the main thread");
+pub fn install() -> mpsc::UnboundedReceiver<()> {
+    let mtm = MainThreadMarker::new().expect("reopen handler must be installed on the main thread");
     let (sender, receiver) = mpsc::unbounded();
     let handler = ReopenHandler::new(mtm, sender);
     let manager: Retained<AnyObject> =
